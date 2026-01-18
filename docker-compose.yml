@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  dental-chatbot-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dental-chatbot-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Google Gemini API (Required)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-2.5-flash}
+      
+      # Google Custom Search API (Optional)
+      - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY:-}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID:-}
+    env_file:
+      - .env
+    volumes:
+       - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dental-chatbot-network
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      # OpenAI-compatible API endpoint (pointing to our backend)
+      - OPENAI_API_BASE_URL=http://dental-chatbot-backend:8000/v1
+      # Authentication (set to false for development, true for production)
+      - WEBUI_AUTH=${WEBUI_AUTH:-false}
+      # Disable Ollama if not using
+      - OLLAMA_BASE_URL=
+      # Default model (optional)
+      - DEFAULT_MODELS=dental-google,dental-duckduckgo
+      # Allow custom API endpoints
+      - ENABLE_RAG_HYBRID_SEARCH=false
+      - ENABLE_RAG_LOCAL_WEB_FETCH=false
+    volumes:
+      - openwebui-data:/app/backend/data
+    depends_on:
+      - dental-chatbot-backend
+    restart: unless-stopped
+    networks:
+      - dental-chatbot-network
+
+volumes:
+  openwebui-data:
+    driver: local
+
+networks:
+  dental-chatbot-network:
+    driver: bridge

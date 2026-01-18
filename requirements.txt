@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+google-generativeai
+duckduckgo-search
+httpx
+python-dotenv
+pydantic
+pydantic-settings
