@@ -25,7 +25,7 @@ class ToolMCPServer(MCPServer):
         return [
             {
                 "name": "google_search",
-                "description": "Search using Google Custom Search API (high accuracy, limited quota)",
+                "description": "Search using Google ADK google_search tool (Gemini 2.0+ with Google Search grounding)",
                 "inputSchema": {
                     "type": "object",
                     "properties": {

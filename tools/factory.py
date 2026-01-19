@@ -23,15 +23,21 @@ class SearchToolFactory:
             Instance of corresponding BaseSearchTool
         """
         if model == "dental-google":
-            tool = GoogleSearchTool()
-            # Check if configured, fallback if not
-            if not tool.is_configured():
+            try:
+                tool = GoogleSearchTool()
+                return tool
+            except ImportError as e:
                 logger.warning(
-                    "Google Search API is not configured. "
+                    f"Google ADK tool not available: {e}. "
                     "Automatically switching to DuckDuckGo."
                 )
                 return DuckDuckGoSearchTool()
-            return tool
+            except Exception as e:
+                logger.warning(
+                    f"Error initializing Google Search tool: {e}. "
+                    "Automatically switching to DuckDuckGo."
+                )
+                return DuckDuckGoSearchTool()
         elif model == "dental-duckduckgo":
             return DuckDuckGoSearchTool()
         else:

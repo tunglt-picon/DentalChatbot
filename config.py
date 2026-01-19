@@ -1,6 +1,5 @@
 """Application configuration."""
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -9,10 +8,6 @@ class Settings(BaseSettings):
     # Google Gemini API
     google_api_key: str
     google_base_model: str = "gemini-2.5-flash"
-    
-    # Google Custom Search API (Optional)
-    google_search_api_key: Optional[str] = None
-    google_cse_id: Optional[str] = None
     
     class Config:
         env_file = ".env"

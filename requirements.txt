@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
 google-generativeai
+google-adk
 duckduckgo-search
-httpx
 python-dotenv
 pydantic
 pydantic-settings

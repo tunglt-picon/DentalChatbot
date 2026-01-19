@@ -1,83 +1,120 @@
-"""Google Custom Search API tool."""
-import httpx
+"""Google Search tool using Google ADK (Agent Development Kit)."""
+import google.generativeai as genai
 import logging
-from typing import Optional
 from .base import BaseSearchTool
 import config
 
 logger = logging.getLogger(__name__)
 
+# Configure Gemini (required for ADK tools)
+genai.configure(api_key=config.settings.google_api_key)
+
 
 class GoogleSearchTool(BaseSearchTool):
-    """Search tool using Google Custom Search API."""
+    """Search tool using Google ADK google_search tool."""
     
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        cse_id: Optional[str] = None
-    ):
+    def __init__(self):
         """
-        Initialize Google Search Tool.
+        Initialize Google Search Tool using ADK.
         
-        Args:
-            api_key: Google Custom Search API key
-            cse_id: Google Custom Search Engine ID
+        Note: ADK google_search tool requires Gemini 2.0+ models.
+        This tool uses Gemini API with Google Search grounding.
         """
-        self.api_key = api_key or config.settings.google_search_api_key
-        self.cse_id = cse_id or config.settings.google_cse_id
-        self.base_url = "https://www.googleapis.com/customsearch/v1"
+        # Use Gemini 2.0+ model for Google Search tool
+        self.model_name = config.settings.google_base_model
+        # Ensure using Gemini 2.0+ model for Google Search compatibility
+        if "gemini-2.0" not in self.model_name and "gemini-2.5" not in self.model_name:
+            logger.warning(
+                f"Model {self.model_name} may not support Google Search tool. "
+                "Google Search tool requires Gemini 2.0+ models. "
+                "Using 'gemini-2.5-flash' for Google Search."
+            )
+            # Auto-upgrade to Gemini 2.5 Flash if not 2.0+
+            self.model_name = "gemini-2.5-flash"
         
+        try:
+            # Import ADK google_search tool
+            from google.adk.tools import google_search as adk_google_search
+            self.google_search_tool = adk_google_search
+            logger.info("ADK google_search tool imported successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import ADK google_search tool: {e}")
+            raise ImportError(
+                "Google ADK is required for Google Search tool. "
+                "Please install: pip install google-adk"
+            )
+    
     def is_configured(self) -> bool:
-        """Check if Google Search is fully configured."""
-        return bool(self.api_key and self.cse_id)
+        """Check if Google Search tool is configured (always True for ADK tool)."""
+        return True
     
     async def search(self, query: str) -> str:
         """
-        Perform search using Google Custom Search API.
+        Perform search using Google ADK google_search tool.
         
         Args:
             query: Search query
             
         Returns:
-            Search results as text
+            Search results as text with sources
         """
-        if not self.is_configured():
-            raise ValueError(
-                "Google Search API is not configured. "
-                "GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID are required."
-            )
-        
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                params = {
-                    "key": self.api_key,
-                    "cx": self.cse_id,
-                    "q": query,
-                    "num": 5  # Get top 5 results
-                }
+            # Use Gemini API with Google Search tool from ADK
+            # Create model with google_search tool
+            model = genai.GenerativeModel(
+                model_name=self.model_name,
+                tools=[self.google_search_tool]
+            )
+            
+            # Create prompt that triggers Google Search tool
+            prompt = f"Please search for information about: {query}. Provide detailed results with sources."
+            
+            # Generate content with Google Search tool
+            # The tool will automatically be invoked when the model determines it needs to search
+            response = model.generate_content(prompt)
+            
+            # Extract the response text
+            result_text = response.text if hasattr(response, 'text') and response.text else ""
+            
+            # Extract grounding metadata (search results with sources)
+            results_with_sources = []
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
                 
-                response = await client.get(self.base_url, params=params)
-                response.raise_for_status()
-                
-                data = response.json()
-                
-                # Extract information from results
-                results = []
-                if "items" in data:
-                    for item in data["items"]:
-                        title = item.get("title", "")
-                        snippet = item.get("snippet", "")
-                        link = item.get("link", "")
-                        results.append(f"Title: {title}\nContent: {snippet}\nLink: {link}\n")
-                
-                if not results:
-                    return f"No results found for query: {query}"
-                
-                return "\n---\n".join(results)
-                
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Google Search API: {e}")
-            raise Exception(f"Error calling Google Search API: {e.response.status_code}")
+                # Check for grounding metadata (contains search sources)
+                if hasattr(candidate, 'grounding_metadata'):
+                    grounding = candidate.grounding_metadata
+                    
+                    # Extract grounding chunks (search results)
+                    if hasattr(grounding, 'grounding_chunks'):
+                        for chunk in grounding.grounding_chunks:
+                            if hasattr(chunk, 'web'):
+                                web = chunk.web
+                                uri = getattr(web, 'uri', '')
+                                title = getattr(web, 'title', '')
+                                # Get text snippet from chunk if available
+                                chunk_text = getattr(chunk, 'text', '')
+                                
+                                if uri:
+                                    results_with_sources.append(
+                                        f"Title: {title}\n"
+                                        f"Content: {chunk_text}\n"
+                                        f"Link: {uri}\n"
+                                    )
+            
+            # Combine response text with formatted sources
+            if results_with_sources:
+                formatted_results = "\n---\n".join(results_with_sources)
+                # Return both the model's response and the formatted sources
+                return f"{result_text}\n\nSearch Sources:\n{formatted_results}"
+            
+            # If no grounding chunks, return the response text
+            if result_text:
+                return result_text
+            
+            return f"No results found for query: {query}"
+            
         except Exception as e:
-            logger.error(f"Unexpected error from Google Search: {e}")
-            raise
+            logger.error(f"Error using Google ADK Search tool: {e}", exc_info=True)
+            # If error occurs, raise to trigger fallback
+            raise Exception(f"Error using Google Search tool: {str(e)}")

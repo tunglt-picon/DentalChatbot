@@ -183,14 +183,12 @@ Answer ONLY: YES or NO
 - `model == "dental-duckduckgo"` → `DuckDuckGoSearchTool`
 
 **Google Search Flow**:
-1. Check configuration (`GOOGLE_SEARCH_API_KEY`, `GOOGLE_CSE_ID`)
-2. If not configured → Auto fallback to DuckDuckGo (log warning)
-3. If configured:
-   - Call Google Custom Search API via `httpx`
-   - Endpoint: `https://www.googleapis.com/customsearch/v1`
-   - Parameters: `key`, `cx` (CSE ID), `q` (query), `num=5`
-   - Parse JSON response
-   - Format results: `Title | Content | Link`
+1. Use Google ADK `google_search` tool (requires Gemini 2.0+ model)
+2. Create Gemini model with `google_search` tool from ADK
+3. Generate content with search query - tool automatically invoked
+4. Extract grounding metadata (search results with sources)
+5. Format results: `Title | Content | Link`
+6. If error occurs → Auto fallback to DuckDuckGo (log warning)
 
 **DuckDuckGo Search Flow**:
 1. Use `duckduckgo-search` library

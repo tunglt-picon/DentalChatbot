@@ -12,10 +12,6 @@ services:
       # Google Gemini API (Required)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-2.5-flash}
-      
-      # Google Custom Search API (Optional)
-      - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY:-}
-      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID:-}
     env_file:
       - .env
     volumes:

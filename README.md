@@ -6,7 +6,7 @@ Backend API for Dental Chatbot using FastAPI, fully compatible with OpenAI API s
 
 - ✅ **OpenAI-Compatible API**: Complies with OpenAI API standard, easy integration with Open WebUI
 - ✅ **Dual Search Strategies**: Supports 2 flexible search strategies:
-  - `dental-google`: Uses Google Custom Search API (high accuracy, limited quota)
+  - `dental-google`: Uses Google ADK google_search tool (Gemini 2.0+ with Google Search grounding)
   - `dental-duckduckgo`: Uses DuckDuckGo (free, unlimited)
 - ✅ **Guardrail System**: Automatically checks if questions belong to the dental field
 - ✅ **Fallback Mechanism**: Automatically switches from Google Search to DuckDuckGo if config is missing or errors occur
@@ -17,8 +17,8 @@ Backend API for Dental Chatbot using FastAPI, fully compatible with OpenAI API s
 - **Framework**: FastAPI
 - **LLM**: Google Gemini (default: `gemini-2.5-flash`)
 - **Search Tools**:
+  - `google-adk`: Google Agent Development Kit with google_search tool
   - `duckduckgo-search`: Python library for DuckDuckGo
-  - `httpx`: Calls Google Custom Search REST API
 - **Configuration**: `python-dotenv`, `pydantic-settings`
 
 ## Installation
@@ -60,9 +60,8 @@ Edit `.env` file with your information:
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_BASE_MODEL=gemini-2.5-flash
 
-# Google Custom Search API (Optional - will fallback to DuckDuckGo if not configured)
-GOOGLE_SEARCH_API_KEY=your_google_search_api_key_here
-GOOGLE_CSE_ID=your_cse_id_here
+# Google Search now uses ADK google_search tool (requires Gemini 2.0+ model)
+# No additional API keys needed for Google Search - it uses the same GOOGLE_API_KEY
 ```
 
 ### 5. Get API Keys
@@ -72,15 +71,16 @@ GOOGLE_CSE_ID=your_cse_id_here
 2. Create a new API key
 3. Copy it to `GOOGLE_API_KEY`
 
-#### Google Custom Search API (Optional)
-1. Visit [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (if you don't have one)
-3. Enable Custom Search API
-4. Create an API key and copy it to `GOOGLE_SEARCH_API_KEY`
-5. Create Custom Search Engine at [Google Programmable Search](https://programmablesearchengine.google.com/)
-6. Copy CSE ID to `GOOGLE_CSE_ID`
+#### Google Search (via ADK)
 
-**Note**: If Google Custom Search is not configured, the system will automatically use DuckDuckGo (free, unlimited).
+Google Search is now powered by Google ADK's `google_search` tool, which uses Gemini 2.0+ models with built-in Google Search grounding. 
+
+**Requirements**:
+- Gemini 2.0+ model (default: `gemini-2.5-flash`)
+- Google ADK package (automatically installed via `requirements.txt`)
+- Uses the same `GOOGLE_API_KEY` as the LLM
+
+**Note**: The Google Search tool requires Gemini 2.0+ models. If your model doesn't support it, the system will automatically fallback to DuckDuckGo.
 
 ## Running the Application
 
@@ -207,7 +207,7 @@ DentalChatbot/
 └── tools/
     ├── __init__.py
     ├── base.py            # BaseSearchTool interface
-    ├── google_search.py   # Google Custom Search implementation
+    ├── google_search.py   # Google ADK google_search tool implementation
     ├── duckduckgo_search.py  # DuckDuckGo search implementation
     └── factory.py         # Search tool factory
 ```
@@ -225,7 +225,7 @@ results = await tool.search(query)
 
 ### Fallback Mechanism
 
-If Google Search is not configured or encounters an error, the system automatically falls back to DuckDuckGo:
+If Google Search tool is not available (e.g., ADK not installed) or encounters an error, the system automatically falls back to DuckDuckGo:
 
 ```python
 if model == "dental-google":
@@ -239,7 +239,7 @@ if model == "dental-google":
 
 ### Error: "Google Search API is not configured"
 
-**Solution**: This is a normal warning. The system will automatically switch to DuckDuckGo. If you want to use Google Search, configure `GOOGLE_SEARCH_API_KEY` and `GOOGLE_CSE_ID` in the `.env` file.
+**Solution**: This is a normal warning. The system will automatically switch to DuckDuckGo. If you want to use Google Search, ensure you're using a Gemini 2.0+ model (e.g., `gemini-2.5-flash`) and that `google-adk` package is installed.
 
 ### Error: "User message not found"
 
