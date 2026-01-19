@@ -1,16 +1,27 @@
-"""OpenAI-compatible API routes with MCP (Memory Context Protocol)."""
+"""OpenAI-compatible API routes with MCP (Model Context Protocol) support."""
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
-from services.chat_service import ChatService
-from services.memory import MemoryService
+from services.chat_service_mcp import ChatServiceMCP
+from mcp.base import MCPHost
+from mcp.servers import MemoryMCPServer, ToolMCPServer
 
 logger = logging.getLogger(__name__)
 
+# Initialize MCP Host and servers
+logger.info("Initializing MCP Host and servers...")
+mcp_host = MCPHost()
+memory_server = MemoryMCPServer()
+tool_server = ToolMCPServer()
+mcp_host.register_server(memory_server)
+mcp_host.register_server(tool_server)
+logger.info("MCP servers registered successfully")
+
+# Initialize ChatService with MCP
+chat_service = ChatServiceMCP(mcp_host=mcp_host)
+
 router = APIRouter()
-memory_service = MemoryService()
-chat_service = ChatService(memory_service=memory_service)
 
 
 class Message(BaseModel):
@@ -59,7 +70,7 @@ async def chat_completions(
     x_conversation_id: Optional[str] = Header(None, alias="X-Conversation-ID")
 ):
     """
-    Handle chat completion requests (OpenAI-compatible endpoint with MCP).
+    Handle chat completion requests (OpenAI-compatible endpoint).
     Routes to appropriate search tool based on model name.
     Supports conversation memory via X-Conversation-ID header.
     """
@@ -77,7 +88,7 @@ async def chat_completions(
         # Convert Pydantic models to dict for service
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         
-        # Process chat with MCP (Memory Context Protocol)
+        # Process chat with conversation memory
         response_text, conversation_id = await chat_service.process_chat(
             messages,
             request.model,
@@ -107,7 +118,7 @@ async def chat_completions(
             }
         }
         
-        # Add conversation_id to response headers for MCP
+        # Add conversation_id to response for conversation continuity
         # Note: FastAPI response headers should be set via Response object
         # For now, we include it in the response body metadata
         response_data["system_fingerprint"] = conversation_id
@@ -125,17 +136,29 @@ async def chat_completions(
 @router.get("/v1/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str):
     """
-    Get conversation context (MCP endpoint).
+    Get conversation context (using MCP).
     """
     try:
-        context = memory_service.get_conversation_context(conversation_id)
-        summary = memory_service.get_conversation_summary(conversation_id)
+        memory_client = mcp_host.get_client("memory-server")
+        if not memory_client:
+            raise HTTPException(status_code=500, detail="Memory server not available")
+        
+        # Get context via MCP
+        context_result = await memory_client.call_method(
+            "memory/get_context",
+            {"conversation_id": conversation_id}
+        )
+        
+        # Get summary directly from memory_server instance
+        summary = memory_server.memory_service.get_conversation_summary(conversation_id)
         
         return {
             "conversation_id": conversation_id,
-            "messages": context,
+            "messages": context_result.get("messages", []),
             "summary": summary
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting conversation: {e}")
         raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
@@ -144,11 +167,20 @@ async def get_conversation(conversation_id: str):
 @router.delete("/v1/conversations/{conversation_id}")
 async def delete_conversation(conversation_id: str):
     """
-    Delete conversation (MCP endpoint).
+    Delete conversation (using MCP).
     """
     try:
-        memory_service.delete_conversation(conversation_id)
-        return {"status": "deleted", "conversation_id": conversation_id}
+        memory_client = mcp_host.get_client("memory-server")
+        if not memory_client:
+            raise HTTPException(status_code=500, detail="Memory server not available")
+        
+        result = await memory_client.call_method(
+            "memory/delete",
+            {"conversation_id": conversation_id}
+        )
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
         raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
@@ -157,11 +189,20 @@ async def delete_conversation(conversation_id: str):
 @router.post("/v1/conversations/{conversation_id}/clear")
 async def clear_conversation(conversation_id: str):
     """
-    Clear conversation history (MCP endpoint).
+    Clear conversation history (using MCP).
     """
     try:
-        memory_service.clear_conversation(conversation_id)
-        return {"status": "cleared", "conversation_id": conversation_id}
+        memory_client = mcp_host.get_client("memory-server")
+        if not memory_client:
+            raise HTTPException(status_code=500, detail="Memory server not available")
+        
+        result = await memory_client.call_method(
+            "memory/clear",
+            {"conversation_id": conversation_id}
+        )
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error clearing conversation: {e}")
         raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")

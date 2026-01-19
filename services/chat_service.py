@@ -14,7 +14,13 @@ genai.configure(api_key=config.settings.google_api_key)
 
 
 class ChatService:
-    """Service for handling chat completion logic with MCP (Memory Context Protocol)."""
+    """
+    Service for handling chat completion logic with conversation memory.
+    
+    Note: This uses MemoryService for conversation history, but does NOT implement
+    MCP (Model Context Protocol). MCP requires proper Host-Client-Server architecture
+    with JSON-RPC 2.0 protocol, which is not implemented here.
+    """
     
     def __init__(self, memory_service: Optional[MemoryService] = None):
         """
@@ -39,7 +45,7 @@ class ChatService:
         Args:
             messages: List of messages in OpenAI format
             model: Selected model name
-            conversation_id: Optional conversation ID for memory context (MCP)
+            conversation_id: Optional conversation ID for memory context
             
         Returns:
             Tuple of (response_text, conversation_id)
@@ -48,7 +54,7 @@ class ChatService:
             ValueError: If question is not related to dentistry
             Exception: If there's an error during processing
         """
-        # MCP: Get or create conversation and merge with memory context
+        # Get or create conversation and merge with memory context
         conv_id = self.memory_service.get_or_create_conversation(conversation_id)
         
         # Get conversation context from memory
@@ -93,7 +99,7 @@ class ChatService:
             else:
                 raise
         
-        # Step 3: Build prompt with conversation context (MCP)
+        # Step 3: Build prompt with conversation context
         conversation_summary = ""
         if len(all_messages) > 1:
             # Include relevant previous conversation context
@@ -127,7 +133,7 @@ Answer:"""
             response = self.model.generate_content(prompt)
             response_text = response.text
             
-            # MCP: Save messages to memory
+            # Save messages to memory
             self.memory_service.add_message(conv_id, "user", user_message)
             self.memory_service.add_message(conv_id, "assistant", response_text)
             

@@ -65,7 +65,13 @@ class ConversationMemory:
 
 
 class MemoryService:
-    """Service for managing multiple conversation memories (MCP - Memory Context Protocol)."""
+    """
+    Service for managing multiple conversation memories.
+    
+    Note: This is a standard memory service, NOT an MCP (Model Context Protocol) server.
+    MCP requires Host-Client-Server architecture with JSON-RPC 2.0 protocol,
+    which is not implemented in this service.
+    """
     
     def __init__(self):
         """Initialize Memory Service."""
@@ -117,7 +123,7 @@ class MemoryService:
         max_messages: Optional[int] = None
     ) -> List[Dict]:
         """
-        Get conversation context (MCP - Memory Context Protocol).
+        Get conversation context.
         
         Args:
             conversation_id: Conversation ID
