@@ -1,6 +1,8 @@
 """Chat Service with MCP (Model Context Protocol) implementation."""
 import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
 import logging
+import asyncio
 from typing import Optional, Tuple
 from mcp.base import MCPHost
 from mcp.servers import MemoryMCPServer, ToolMCPServer
@@ -132,28 +134,60 @@ class ChatServiceMCP:
                     conversation_summary += f"{role}: {msg.get('content', '')}\n"
         
         prompt = f"""You are a professional dental consultant with extensive knowledge. 
-Your task is to answer the patient's question based on the search information and conversation context.
-
-{conversation_summary}
-
-Current patient's question: {user_message}
-
-Search information:
-{search_results}
-
-Please answer the question in a way that is:
-- Accurate and based on search information
-- Consistent with previous conversation context (if any)
-- Easy to understand and friendly
-- Mentions reference sources if available
-- Note: If information is incomplete, suggest the patient consult a dentist
-
-Answer:"""
+            Your task is to answer the patient's question based on the search information and conversation context.
+            
+            {conversation_summary}
+            
+            Current patient's question: {user_message}
+            
+            Search information:
+            {search_results}
+            
+            Please answer the question in a way that is:
+            - Accurate and based on search information
+            - Consistent with previous conversation context (if any)
+            - Easy to understand and friendly
+            - Mentions reference sources if available
+            - Note: If information is incomplete, suggest the patient consult a dentist
         
-        # Step 7: Generate response with LLM
-        try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text
+        Answer:"""
+        
+        # Step 7: Generate response with LLM (with retry for rate limits)
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                # generate_content is sync, but we're in async context
+                response = self.model.generate_content(prompt)
+                response_text = response.text
+                break  # Success, exit retry loop
+            except google_exceptions.ResourceExhausted as e:
+                if attempt < max_retries - 1:
+                    # Extract retry delay from error if available
+                    retry_seconds = 60  # Default 60 seconds
+                    if "retry in" in str(e).lower():
+                        # Try to extract seconds from error message
+                        import re
+                        match = re.search(r'retry in ([\d.]+)s', str(e), re.IGNORECASE)
+                        if match:
+                            retry_seconds = int(float(match.group(1))) + 5  # Add buffer
+                    
+                    logger.warning(
+                        f"Rate limit exceeded (attempt {attempt + 1}/{max_retries}). "
+                        f"Retrying in {retry_seconds} seconds..."
+                    )
+                    await asyncio.sleep(retry_seconds)
+                else:
+                    # Last attempt failed
+                    logger.error(f"Rate limit exceeded after {max_retries} attempts")
+                    raise Exception(
+                        f"Gemini API rate limit exceeded. Please wait before retrying. "
+                        f"Free tier allows 5 requests/minute. Error: {str(e)}"
+                    )
+            except Exception as e:
+                # Other errors - don't retry
+                logger.error(f"Error generating response from LLM: {e}")
+                raise Exception(f"Error generating response: {str(e)}")
             
             # Step 8: MCP - Save messages to Memory Server
             await self.memory_client.call_method(
@@ -166,7 +200,3 @@ Answer:"""
             )
             
             return response_text, conv_id
-            
-        except Exception as e:
-            logger.error(f"Error generating response from LLM: {e}")
-            raise Exception(f"Error generating response: {str(e)}")

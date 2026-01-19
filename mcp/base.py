@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Callable, Union
 import logging
+import inspect
 from .protocol import JSONRPCRequest, JSONRPCResponse, JSONRPCError, JSONRPCErrorCode
 
 logger = logging.getLogger(__name__)
@@ -55,16 +56,21 @@ class MCPServer(ABC):
         try:
             handler = self.methods[method_name]
             # Handle both sync and async handlers
-            if hasattr(handler, '__call__'):
-                if hasattr(handler, '__await__'):
-                    result = await handler(**request.params) if isinstance(request.params, dict) else await handler(*request.params)
-                else:
-                    result = handler(**request.params) if isinstance(request.params, dict) else handler(*request.params)
-            else:
+            if not callable(handler):
                 raise JSONRPCError(
                     JSONRPCErrorCode.INTERNAL_ERROR.value,
                     f"Handler for method '{method_name}' is not callable"
                 )
+            
+            # Call handler and check if result is coroutine
+            if isinstance(request.params, dict):
+                result = handler(**request.params)
+            else:
+                result = handler(*request.params) if request.params else handler()
+            
+            # If result is a coroutine, await it
+            if inspect.iscoroutine(result):
+                result = await result
             
             return JSONRPCResponse.success(result, request_id=request.id)
             
