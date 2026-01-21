@@ -1,21 +1,24 @@
 # Dental Chatbot Backend
 
-Backend API for Dental Chatbot using FastAPI, fully compatible with OpenAI API standard for integration with Open WebUI interface.
+Backend API for Dental Chatbot using FastAPI with Ollama LLM (free, no rate limits) and built-in web interface.
 
 ## Features
 
-- ✅ **OpenAI-Compatible API**: Complies with OpenAI API standard, easy integration with Open WebUI
-- ✅ **Dual Search Strategies**: Supports 2 flexible search strategies:
-  - `dental-google`: Uses Google ADK google_search tool (Gemini 2.0+ with Google Search grounding)
+- ✅ **Built-in Web Interface**: Simple and clean chat interface with configuration page
+- ✅ **OpenAI-Compatible API**: Complies with OpenAI API standard
+- ✅ **Dual Search Strategies**: 
+  - `dental-google`: Uses Google ADK google_search tool
   - `dental-duckduckgo`: Uses DuckDuckGo (free, unlimited)
 - ✅ **Guardrail System**: Automatically checks if questions belong to the dental field
-- ✅ **Fallback Mechanism**: Automatically switches from Google Search to DuckDuckGo if config is missing or errors occur
-- ✅ **Clean Architecture**: Implements Factory Pattern, separates routers, services, tools
+- ✅ **Multiple LLM Providers**: Supports Ollama (default), Groq, Gemini, Hugging Face
+- ✅ **Configuration Page**: Web UI to configure models and search tools
+- ✅ **Clean Architecture**: Implements Factory Pattern, MCP architecture
 
 ## Technology Stack
 
 - **Framework**: FastAPI
-- **LLM**: Google Gemini (default: `gemini-2.5-flash`)
+- **LLM**: Ollama (default - free, no rate limits)
+  - Alternative: Groq, Gemini, Hugging Face
 - **Search Tools**:
   - `google-adk`: Google Agent Development Kit with google_search tool
   - `duckduckgo-search`: Python library for DuckDuckGo
@@ -30,7 +33,18 @@ git clone <repository-url>
 cd DentalChatbot
 ```
 
-### 2. Create virtual environment (recommended)
+### 2. Install Ollama (Required)
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull recommended models
+ollama pull llama3.2        # For guardrail and chat (~2GB)
+ollama pull qwen2.5:7b      # Better Vietnamese support (~4.5GB, optional)
+```
+
+### 3. Create virtual environment
 
 ```bash
 python -m venv venv
@@ -39,13 +53,13 @@ source venv/bin/activate  # On Linux/Mac
 venv\Scripts\activate  # On Windows
 ```
 
-### 3. Install dependencies
+### 4. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 5. Configure environment variables
 
 Copy `.env.example` to `.env`:
 
@@ -53,34 +67,27 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 
-Edit `.env` file with your information:
+Edit `.env` file:
 
 ```env
-# Google Gemini API for LLM (Required)
-GOOGLE_API_KEY=your_google_api_key_here
-GOOGLE_BASE_MODEL=gemini-2.5-flash
+# Ollama Settings (Default - Recommended)
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OLLAMA_GUARDRAIL_MODEL=llama3.2
 
-# Google Search now uses ADK google_search tool (requires Gemini 2.0+ model)
-# No additional API keys needed for Google Search - it uses the same GOOGLE_API_KEY
+# Optional: Google Gemini (only if using Gemini)
+GOOGLE_API_KEY=your_google_api_key_here
+
+# Optional: Groq (only if using Groq)
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### 5. Get API Keys
+### 6. Start Ollama (if not running)
 
-#### Google Gemini API Key (Required)
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Copy it to `GOOGLE_API_KEY`
-
-#### Google Search (via ADK)
-
-Google Search is now powered by Google ADK's `google_search` tool, which uses Gemini 2.0+ models with built-in Google Search grounding. 
-
-**Requirements**:
-- Gemini 2.0+ model (default: `gemini-2.5-flash`)
-- Google ADK package (automatically installed via `requirements.txt`)
-- Uses the same `GOOGLE_API_KEY` as the LLM
-
-**Note**: The Google Search tool requires Gemini 2.0+ models. If your model doesn't support it, the system will automatically fallback to DuckDuckGo.
+```bash
+ollama serve
+```
 
 ## Running the Application
 
@@ -98,11 +105,28 @@ uvicorn main:app --reload
 
 Server will run at: `http://localhost:8000`
 
-### Production mode
+### Access Web Interface
 
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
-```
+Open browser: `http://localhost:8000`
+
+- **Chat Interface**: Main page for chatting
+- **Configuration**: `/config` - Configure models and search tools
+
+## Web Interface
+
+### Chat Page (`/`)
+
+- Select search tool (Google/DuckDuckGo)
+- Chat with the dental assistant
+- View chat history
+- Continue previous conversations
+
+### Configuration Page (`/config`)
+
+Configure:
+- **Chat Model**: LLM provider and model for generating responses
+- **Guardrail Model**: Model for checking if questions are dental-related
+- **Search Tool**: Default search engine (Google/DuckDuckGo)
 
 ## API Endpoints
 
@@ -128,11 +152,11 @@ Handle chat completion request.
 **Request Body:**
 ```json
 {
-  "model": "dental-google",
+  "model": "dental-duckduckgo",
   "messages": [
     {"role": "user", "content": "What causes tooth decay?"}
   ],
-  "temperature": 0.7
+  "chat_id": "optional-chat-id"
 }
 ```
 
@@ -142,7 +166,7 @@ Handle chat completion request.
   "id": "chatcmpl-123456",
   "object": "chat.completion",
   "created": 1234567890,
-  "model": "dental-google",
+  "model": "dental-duckduckgo",
   "choices": [
     {
       "index": 0,
@@ -157,36 +181,87 @@ Handle chat completion request.
     "prompt_tokens": 0,
     "completion_tokens": 0,
     "total_tokens": 0
-  }
+  },
+  "system_fingerprint": "conversation-id"
 }
 ```
 
-### 3. GET `/`
+### 3. GET `/config`
 
-Root endpoint - API information
+Configuration page (web interface).
 
 ### 4. GET `/health`
 
-Health check endpoint
+Health check endpoint.
 
-## Connecting to Open WebUI
+## LLM Providers
 
-1. Open Open WebUI
-2. Go to Settings → Connections → External API
-3. Add a new connection with:
-   - **API Base URL**: `http://localhost:8000` (or your server URL)
-   - **API Type**: OpenAI Compatible
-4. In the Model menu, you will see 2 options:
-   - `dental-google`
-   - `dental-duckduckgo`
-5. Select a model and start chatting!
+### Ollama (Default - Recommended)
 
-## Processing Workflow
+**Advantages:**
+- ✅ Completely free
+- ✅ No rate limits
+- ✅ Runs locally (secure)
+- ✅ Good Vietnamese support (qwen2.5:7b)
 
-1. **Guardrail Check**: Gemini Flash checks if the question belongs to the dental field
-2. **Tool Selection**: Based on model name to select search tool (Factory Pattern)
-3. **Search Execution**: Perform search and retrieve results
-4. **LLM Summarization**: Gemini reads search results and answers the question
+**Setup:**
+```bash
+ollama pull llama3.2
+ollama pull qwen2.5:7b  # For better Vietnamese
+```
+
+**Configuration:**
+```env
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2
+OLLAMA_GUARDRAIL_MODEL=llama3.2
+```
+
+### Groq (Alternative)
+
+**Advantages:**
+- ✅ Free tier: 30 requests/second
+- ✅ Very fast inference
+- ✅ Good quality models
+
+**Configuration:**
+```env
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+### Google Gemini (Alternative)
+
+**Configuration:**
+```env
+LLM_PROVIDER=gemini
+GOOGLE_API_KEY=your_key_here
+GOOGLE_BASE_MODEL=gemini-2.5-flash
+```
+
+## Docker Setup
+
+### Using Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+**Note**: Ollama needs to run on the host machine or in a separate container. Update `OLLAMA_BASE_URL` in docker-compose.yml if Ollama runs elsewhere.
+
+### Dockerfile
+
+```bash
+docker build -t dental-chatbot .
+docker run -p 8000:8000 dental-chatbot
+```
+
+## Error Handling
+
+- **Rate Limit Errors**: Returns error message to user (no automatic fallback)
+- **Search Tool Errors**: Returns error message (no automatic fallback)
+- **Guardrail Rejection**: Returns friendly error message explaining the limitation
 
 ## Project Structure
 
@@ -195,93 +270,55 @@ DentalChatbot/
 ├── main.py                 # FastAPI application entry point
 ├── config.py               # Configuration management
 ├── requirements.txt        # Python dependencies
-├── .env.example           # Environment variables template
-├── .gitignore             # Git ignore file
+├── templates/              # HTML templates
+│   ├── index.html         # Chat interface
+│   └── config.html        # Configuration page
+├── static/                 # Static files
+│   ├── css/
+│   │   └── style.css      # Styles
+│   └── js/
+│       ├── app.js         # Chat interface logic
+│       └── config.js      # Configuration page logic
 ├── routers/
-│   ├── __init__.py
 │   └── openai.py          # OpenAI-compatible API routes
 ├── services/
-│   ├── __init__.py
-│   ├── guardrail.py       # Guardrail service (domain check)
-│   └── chat_service.py    # Chat completion service
+│   ├── chat_service.py    # Chat completion service
+│   ├── guardrail.py       # Guardrail service
+│   ├── llm_provider.py    # LLM provider abstraction
+│   └── memory.py          # Memory service
 └── tools/
-    ├── __init__.py
     ├── base.py            # BaseSearchTool interface
-    ├── google_search.py   # Google ADK google_search tool implementation
-    ├── duckduckgo_search.py  # DuckDuckGo search implementation
+    ├── google_search.py   # Google ADK search tool
+    ├── duckduckgo_search.py  # DuckDuckGo search
     └── factory.py         # Search tool factory
-```
-
-## Design Patterns
-
-### Factory Pattern
-
-`SearchToolFactory` uses Factory Pattern to create search tool based on model name:
-
-```python
-tool = SearchToolFactory.create_search_tool("dental-google")
-results = await tool.search(query)
-```
-
-### Fallback Mechanism
-
-If Google Search tool is not available (e.g., ADK not installed) or encounters an error, the system automatically falls back to DuckDuckGo:
-
-```python
-if model == "dental-google":
-    tool = GoogleSearchTool()
-    if not tool.is_configured():
-        # Auto fallback to DuckDuckGo
-        tool = DuckDuckGoSearchTool()
 ```
 
 ## Troubleshooting
 
-### Error: "Google Search API is not configured"
-
-**Solution**: This is a normal warning. The system will automatically switch to DuckDuckGo. If you want to use Google Search, ensure you're using a Gemini 2.0+ model (e.g., `gemini-2.5-flash`) and that `google-adk` package is installed.
-
-### Error: "User message not found"
-
-**Solution**: Ensure the request body has at least one message with `role: "user"`.
-
-### Error: "Sorry, I can only answer questions related to the dental field"
-
-**Solution**: This is a response from the guardrail. The system can only answer questions related to dentistry.
-
-## Development
-
-### Run tests (if available)
+### Ollama Connection Error
 
 ```bash
-pytest
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# Start Ollama if not running
+ollama serve
 ```
 
-### Format code
+### Model Not Found
 
 ```bash
-black .
+# Pull the required model
+ollama pull llama3.2
+ollama pull qwen2.5:7b
 ```
 
-### Lint code
+### Rate Limit Errors
 
-```bash
-flake8 .
-```
+- If using Ollama: No rate limits, check if Ollama is running
+- If using Groq: Check API key and rate limit (30 req/s)
+- If using Gemini: Free tier has strict limits, consider switching to Ollama
 
 ## License
 
-MIT License
-
-## Contributors
-
-- Initial implementation by AI Assistant
-
-## Changelog
-
-### v1.0.0
-- Initial release
-- OpenAI-compatible API
-- Dual search strategies (Google & DuckDuckGo)
-- Guardrail system
-- Fallback mechanism
+MIT

@@ -23,21 +23,8 @@ class SearchToolFactory:
             Instance of corresponding BaseSearchTool
         """
         if model == "dental-google":
-            try:
-                tool = GoogleSearchTool()
-                return tool
-            except ImportError as e:
-                logger.warning(
-                    f"Google ADK tool not available: {e}. "
-                    "Automatically switching to DuckDuckGo."
-                )
-                return DuckDuckGoSearchTool()
-            except Exception as e:
-                logger.warning(
-                    f"Error initializing Google Search tool: {e}. "
-                    "Automatically switching to DuckDuckGo."
-                )
-                return DuckDuckGoSearchTool()
+            tool = GoogleSearchTool()
+            return tool
         elif model == "dental-duckduckgo":
             return DuckDuckGoSearchTool()
         else:

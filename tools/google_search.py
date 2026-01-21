@@ -58,9 +58,13 @@ class GoogleSearchTool(BaseSearchTool):
         Returns:
             Search results as text with sources
         """
+        logger.info(f"[GOOGLE_SEARCH] Starting search for query: {query[:100]}...")
+        logger.info(f"[GOOGLE_SEARCH] Using model: {self.model_name}")
+        
         try:
             # Use Gemini API with Google Search tool from ADK
             # Create model with google_search tool
+            logger.debug(f"[GOOGLE_SEARCH] Creating Gemini model with google_search tool")
             model = genai.GenerativeModel(
                 model_name=self.model_name,
                 tools=[self.google_search_tool]
@@ -68,13 +72,17 @@ class GoogleSearchTool(BaseSearchTool):
             
             # Create prompt that triggers Google Search tool
             prompt = f"Please search for information about: {query}. Provide detailed results with sources."
+            logger.debug(f"[GOOGLE_SEARCH] Prompt created, length: {len(prompt)}")
             
             # Generate content with Google Search tool
             # The tool will automatically be invoked when the model determines it needs to search
+            logger.info(f"[GOOGLE_SEARCH] Calling Gemini API with search tool...")
             response = model.generate_content(prompt)
+            logger.debug(f"[GOOGLE_SEARCH] Gemini API response received")
             
             # Extract the response text
             result_text = response.text if hasattr(response, 'text') and response.text else ""
+            logger.debug(f"[GOOGLE_SEARCH] Response text length: {len(result_text)}")
             
             # Extract grounding metadata (search results with sources)
             results_with_sources = []
@@ -87,6 +95,7 @@ class GoogleSearchTool(BaseSearchTool):
                     
                     # Extract grounding chunks (search results)
                     if hasattr(grounding, 'grounding_chunks'):
+                        logger.debug(f"[GOOGLE_SEARCH] Extracting grounding chunks...")
                         for chunk in grounding.grounding_chunks:
                             if hasattr(chunk, 'web'):
                                 web = chunk.web
@@ -101,20 +110,25 @@ class GoogleSearchTool(BaseSearchTool):
                                         f"Content: {chunk_text}\n"
                                         f"Link: {uri}\n"
                                     )
+                        logger.info(f"[GOOGLE_SEARCH] Extracted {len(results_with_sources)} search sources")
             
             # Combine response text with formatted sources
             if results_with_sources:
                 formatted_results = "\n---\n".join(results_with_sources)
                 # Return both the model's response and the formatted sources
-                return f"{result_text}\n\nSearch Sources:\n{formatted_results}"
+                final_result = f"{result_text}\n\nSearch Sources:\n{formatted_results}"
+                logger.info(f"[GOOGLE_SEARCH] Search completed. Total result length: {len(final_result)} characters")
+                return final_result
             
             # If no grounding chunks, return the response text
             if result_text:
+                logger.info(f"[GOOGLE_SEARCH] Search completed. Using response text only. Length: {len(result_text)}")
                 return result_text
             
+            logger.warning(f"[GOOGLE_SEARCH] No results found for query: {query}")
             return f"No results found for query: {query}"
             
         except Exception as e:
-            logger.error(f"Error using Google ADK Search tool: {e}", exc_info=True)
-            # If error occurs, raise to trigger fallback
+            logger.error(f"[GOOGLE_SEARCH] Error: {e}", exc_info=True)
+            # If error occurs, raise error (no fallback)
             raise Exception(f"Error using Google Search tool: {str(e)}")

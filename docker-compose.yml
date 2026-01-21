@@ -9,9 +9,19 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Google Gemini API (Required)
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # LLM Provider Selection
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - GUARDRAIL_PROVIDER=${GUARDRAIL_PROVIDER:-ollama}
+      
+      # Ollama Settings (Default - Recommended)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_GUARDRAIL_MODEL=${OLLAMA_GUARDRAIL_MODEL:-llama3.2}
+      
+      # Google Gemini (only if using Gemini)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-2.5-flash}
+      - GOOGLE_GUARDRAIL_MODEL=${GOOGLE_GUARDRAIL_MODEL:-}
     env_file:
       - .env
     volumes:
@@ -26,34 +36,28 @@ services:
     networks:
       - dental-chatbot-network
 
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    ports:
-      - "3000:8080"
-    environment:
-      # OpenAI-compatible API endpoint (pointing to our backend)
-      - OPENAI_API_BASE_URL=http://dental-chatbot-backend:8000/v1
-      # Authentication (set to false for development, true for production)
-      - WEBUI_AUTH=${WEBUI_AUTH:-false}
-      # Disable Ollama if not using
-      - OLLAMA_BASE_URL=
-      # Default model (optional)
-      - DEFAULT_MODELS=dental-google,dental-duckduckgo
-      # Allow custom API endpoints
-      - ENABLE_RAG_HYBRID_SEARCH=false
-      - ENABLE_RAG_LOCAL_WEB_FETCH=false
-    volumes:
-      - openwebui-data:/app/backend/data
-    depends_on:
-      - dental-chatbot-backend
-    restart: unless-stopped
-    networks:
-      - dental-chatbot-network
+  # Open WebUI is optional - we have built-in web interface at http://localhost:8000
+  # Uncomment below if you want to use Open WebUI instead
+  # open-webui:
+  #   image: ghcr.io/open-webui/open-webui:main
+  #   container_name: open-webui
+  #   ports:
+  #     - "3000:8080"
+  #   environment:
+  #     - OPENAI_API_BASE_URL=http://dental-chatbot-backend:8000/v1
+  #     - WEBUI_AUTH=${WEBUI_AUTH:-false}
+  #     - DEFAULT_MODELS=dental-google,dental-duckduckgo
+  #   volumes:
+  #     - openwebui-data:/app/backend/data
+  #   depends_on:
+  #     - dental-chatbot-backend
+  #   restart: unless-stopped
+  #   networks:
+  #     - dental-chatbot-network
 
-volumes:
-  openwebui-data:
-    driver: local
+# volumes:
+#   openwebui-data:
+#     driver: local
 
 networks:
   dental-chatbot-network:

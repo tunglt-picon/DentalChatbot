@@ -6,3 +6,5 @@ duckduckgo-search
 python-dotenv
 pydantic
 pydantic-settings
+aiofiles
+httpx
