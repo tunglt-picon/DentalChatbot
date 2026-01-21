@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental Chatbot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>🦷 Dental Chatbot</h1>
+                <button class="btn-new-chat" id="btnNewChat">+ New Chat</button>
+                <a href="/config" class="btn-config" style="display: block; margin-top: 10px; padding: 8px; background: #4a5568; color: white; text-align: center; text-decoration: none; border-radius: 6px; font-size: 12px;">⚙️ Config</a>
+            </div>
+            
+            <div class="model-selector">
+                <label for="modelSelect">Search Model:</label>
+                <select id="modelSelect">
+                    <option value="dental-google">Google Search</option>
+                    <option value="dental-duckduckgo" selected>DuckDuckGo Search</option>
+                </select>
+            </div>
+            
+            <div class="chat-list">
+                <h3>Chat History</h3>
+                <div id="chatList" class="chat-items">
+                    <!-- Chat items will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <h2 id="chatTitle">New Chat</h2>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <h3>Welcome to Dental Chatbot! 👋</h3>
+                    <p>Ask me anything about dental health, teeth, gums, or oral hygiene.</p>
+                    <p>Select a search model and start chatting!</p>
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Type your question about dental health..."
+                        rows="3"
+                    ></textarea>
+                    <button id="sendButton" class="btn-send">Send</button>
+                </div>
+                <div class="input-footer">
+                    <span class="model-indicator">Model: <span id="currentModel">DuckDuckGo Search</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

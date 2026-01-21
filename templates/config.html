@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration - Dental Chatbot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .config-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .config-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 8px;
+            border-left: 4px solid #4299e1;
+        }
+        .config-section h3 {
+            margin-top: 0;
+            color: #2d3748;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 14px;
+        }
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #718096;
+            font-size: 12px;
+        }
+        .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-save:hover {
+            background: #3182ce;
+        }
+        .btn-back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #4299e1;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .btn-back:hover {
+            text-decoration: underline;
+        }
+        .status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status-message.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        .status-message.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #fc8181;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="config-container">
+            <a href="/" class="btn-back">← Back to Chat</a>
+            <h1>⚙️ Configuration</h1>
+            
+            <div id="statusMessage" class="status-message"></div>
+            
+            <form id="configForm">
+                <!-- LLM Provider for Chat -->
+                <div class="config-section">
+                    <h3>Chat Model (for generating responses)</h3>
+                    <div class="form-group">
+                        <label for="llmProvider">LLM Provider:</label>
+                        <select id="llmProvider" name="llm_provider">
+                            <option value="ollama" selected>Ollama (Recommended - Free, No Limits)</option>
+                            <option value="gemini">Google Gemini (Free - Limited)</option>
+                        </select>
+                        <small>Model used for generating chat responses after search</small>
+                    </div>
+                    <div class="form-group" id="ollamaChatGroup">
+                        <label for="ollamaChatModel">Ollama Model:</label>
+                        <select id="ollamaChatModel" name="ollama_model">
+                            <option value="llama3.2" selected>llama3.2 (Lightweight, ~2GB)</option>
+                            <option value="qwen2.5:7b">qwen2.5:7b (Good Vietnamese, ~4.5GB)</option>
+                            <option value="mistral">mistral (High Quality, ~4GB)</option>
+                            <option value="phi-3">phi-3 (Very Light, ~2GB)</option>
+                        </select>
+                        <small>Model to use for Ollama provider</small>
+                    </div>
+                    <div class="form-group" id="geminiChatGroup" style="display: none;">
+                        <label for="geminiChatModel">Gemini Model:</label>
+                        <select id="geminiChatModel" name="gemini_model">
+                            <option value="gemini-2.5-flash" selected>gemini-2.5-flash (Fast)</option>
+                            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                        </select>
+                        <small>Model to use for Gemini provider</small>
+                    </div>
+                </div>
+                
+                <!-- Guardrail Model -->
+                <div class="config-section">
+                    <h3>Guardrail Model (for checking if question is dental-related)</h3>
+                    <div class="form-group">
+                        <label for="guardrailProvider">Guardrail Provider:</label>
+                        <select id="guardrailProvider" name="guardrail_provider">
+                            <option value="ollama" selected>Ollama (Recommended)</option>
+                            <option value="gemini">Google Gemini</option>
+                        </select>
+                        <small>Model used to check if questions are dental-related</small>
+                    </div>
+                    <div class="form-group" id="ollamaGuardrailGroup">
+                        <label for="ollamaGuardrailModel">Ollama Model (Guardrail):</label>
+                        <select id="ollamaGuardrailModel" name="ollama_guardrail_model">
+                            <option value="llama3.2">llama3.2 (Recommended - Lightweight)</option>
+                            <option value="phi-3">phi-3 (Very Light)</option>
+                        </select>
+                        <small>Lighter model recommended for guardrail</small>
+                    </div>
+                </div>
+                
+                <!-- Search Tool -->
+                <div class="config-section">
+                    <h3>Search Tool</h3>
+                    <div class="form-group">
+                        <label for="searchTool">Default Search Tool:</label>
+                        <select id="searchTool" name="search_tool">
+                            <option value="duckduckgo">DuckDuckGo (Free, Unlimited)</option>
+                            <option value="google">Google Search (ADK - Requires Gemini 2.0+)</option>
+                        </select>
+                        <small>Search engine to use for finding information</small>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-save">Save Configuration</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="/static/js/config.js"></script>
+</body>
+</html>
