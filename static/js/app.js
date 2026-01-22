@@ -19,8 +19,19 @@ const currentModelSpan = document.getElementById('currentModel');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadChats();
+    loadConfig();
     setupEventListeners();
 });
+
+// Load config from localStorage
+function loadConfig() {
+    const saved = localStorage.getItem('dentalChatbot_config');
+    if (saved) {
+        const config = JSON.parse(saved);
+        // Config will be sent with each request
+        console.log('Loaded config:', config);
+    }
+}
 
 // Event Listeners
 function setupEventListeners() {
@@ -320,6 +331,9 @@ async function sendMessage() {
             timestamp: Date.now()
         });
         
+        // Get current config and include in request
+        const config = getCurrentConfig();
+        
         // Call API
         const response = await fetch(`${API_BASE}/chat/completions`, {
             method: 'POST',
@@ -332,7 +346,9 @@ async function sendMessage() {
                     role: m.role,
                     content: m.content
                 })),
-                chat_id: currentChatId
+                chat_id: currentChatId,
+                // Include config in request so backend can use it
+                config: config
             })
         });
         

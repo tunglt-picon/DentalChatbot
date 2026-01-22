@@ -108,40 +108,9 @@
             <div id="statusMessage" class="status-message"></div>
             
             <form id="configForm">
-                <!-- LLM Provider for Chat -->
+                <!-- Guardrail Model - MOVED TO TOP -->
                 <div class="config-section">
-                    <h3>Chat Model (for generating responses)</h3>
-                    <div class="form-group">
-                        <label for="llmProvider">LLM Provider:</label>
-                        <select id="llmProvider" name="llm_provider">
-                            <option value="ollama" selected>Ollama (Recommended - Free, No Limits)</option>
-                            <option value="gemini">Google Gemini (Free - Limited)</option>
-                        </select>
-                        <small>Model used for generating chat responses after search</small>
-                    </div>
-                    <div class="form-group" id="ollamaChatGroup">
-                        <label for="ollamaChatModel">Ollama Model:</label>
-                        <select id="ollamaChatModel" name="ollama_model">
-                            <option value="llama3.2" selected>llama3.2 (Lightweight, ~2GB)</option>
-                            <option value="qwen2.5:7b">qwen2.5:7b (Good Vietnamese, ~4.5GB)</option>
-                            <option value="mistral">mistral (High Quality, ~4GB)</option>
-                            <option value="phi-3">phi-3 (Very Light, ~2GB)</option>
-                        </select>
-                        <small>Model to use for Ollama provider</small>
-                    </div>
-                    <div class="form-group" id="geminiChatGroup" style="display: none;">
-                        <label for="geminiChatModel">Gemini Model:</label>
-                        <select id="geminiChatModel" name="gemini_model">
-                            <option value="gemini-2.5-flash" selected>gemini-2.5-flash (Fast)</option>
-                            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                        </select>
-                        <small>Model to use for Gemini provider</small>
-                    </div>
-                </div>
-                
-                <!-- Guardrail Model -->
-                <div class="config-section">
-                    <h3>Guardrail Model (for checking if question is dental-related)</h3>
+                    <h3>🛡️ Guardrail Model (for checking if question is dental-related)</h3>
                     <div class="form-group">
                         <label for="guardrailProvider">Guardrail Provider:</label>
                         <select id="guardrailProvider" name="guardrail_provider">
@@ -151,12 +120,52 @@
                         <small>Model used to check if questions are dental-related</small>
                     </div>
                     <div class="form-group" id="ollamaGuardrailGroup">
-                        <label for="ollamaGuardrailModel">Ollama Model (Guardrail):</label>
+                        <label for="ollamaGuardrailModel">Ollama Model (Guardrail - Lightweight):</label>
                         <select id="ollamaGuardrailModel" name="ollama_guardrail_model">
-                            <option value="llama3.2">llama3.2 (Recommended - Lightweight)</option>
-                            <option value="phi-3">phi-3 (Very Light)</option>
+                            <option value="phi-3" selected>phi-3 (Very Light, ~2GB, Fast)</option>
+                            <option value="tinyllama">tinyllama (Ultra Light, ~700MB, Fastest)</option>
                         </select>
-                        <small>Lighter model recommended for guardrail</small>
+                        <small>Lightweight models recommended for fast guardrail checks</small>
+                    </div>
+                    <div class="form-group" id="geminiGuardrailGroup" style="display: none;">
+                        <label for="geminiGuardrailModel">Gemini Model (Guardrail):</label>
+                        <select id="geminiGuardrailModel" name="gemini_guardrail_model">
+                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier)</option>
+                            <option value="gemini-2.5-flash">gemini-2.5-flash (Faster, Free Tier)</option>
+                        </select>
+                        <small>Fast models for guardrail checks</small>
+                    </div>
+                </div>
+                
+                <!-- LLM Provider for Chat -->
+                <div class="config-section">
+                    <h3>💬 Chat Model (for generating responses)</h3>
+                    <div class="form-group">
+                        <label for="llmProvider">LLM Provider:</label>
+                        <select id="llmProvider" name="llm_provider">
+                            <option value="ollama" selected>Ollama (Recommended - Free, No Limits)</option>
+                            <option value="gemini">Google Gemini (Free - Limited)</option>
+                        </select>
+                        <small>Model used for generating chat responses after search</small>
+                    </div>
+                    <div class="form-group" id="ollamaChatGroup">
+                        <label for="ollamaChatModel">Ollama Model (Chat - Heavy for Reasoning):</label>
+                        <select id="ollamaChatModel" name="ollama_model">
+                            <option value="qwen2.5:7b" selected>qwen2.5:7b (Best Vietnamese Support, ~4.5GB, Recommended)</option>
+                            <option value="llama3.2:3b">llama3.2:3b (Lightweight & Fast, ~2GB, Good Quality)</option>
+                        </select>
+                        <small>
+                            <strong>qwen2.5:7b</strong>: Best for Vietnamese, excellent reasoning, high quality responses<br>
+                            <strong>llama3.2:3b</strong>: Faster, lighter, good quality, suitable for lower-end hardware
+                        </small>
+                    </div>
+                    <div class="form-group" id="geminiChatGroup" style="display: none;">
+                        <label for="geminiChatModel">Gemini Model (Chat):</label>
+                        <select id="geminiChatModel" name="gemini_model">
+                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier)</option>
+                            <option value="gemini-2.5-flash">gemini-2.5-flash (Faster, Free Tier)</option>
+                        </select>
+                        <small>Model to use for Gemini provider</small>
                     </div>
                 </div>
                 

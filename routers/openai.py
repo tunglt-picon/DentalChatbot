@@ -93,9 +93,10 @@ async def chat_completions(request: ChatCompletionRequest):
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         logger.debug(f"[REQUEST] Parsed {len(messages)} messages from request")
         
-        # Get chat_id from payload (if provided)
+        # Get chat_id and config from payload (if provided)
         request_dump = request.model_dump()
         conversation_id = request.chat_id or request_dump.get("chat_id")
+        user_config = request_dump.get("config")
         
         # Log conversation_id status (for debugging)
         if conversation_id:
@@ -103,9 +104,68 @@ async def chat_completions(request: ChatCompletionRequest):
         else:
             logger.warning("[REQUEST] No chat_id in payload, will create new conversation")
         
+        # Apply user config if provided (override environment variables for this request)
+        if user_config:
+            logger.info(f"[REQUEST] Applying user config: {user_config}")
+            # Create a temporary config override
+            import config as app_config
+            from services.llm_provider import create_llm_provider
+            from services.guardrail import GuardrailService
+            
+            # Get config values (use user config if provided, else use defaults)
+            llm_provider = user_config.get("llm_provider") or app_config.settings.llm_provider
+            guardrail_provider = user_config.get("guardrail_provider") or app_config.settings.guardrail_provider
+            
+            # Create LLM provider with user config
+            if llm_provider == "ollama":
+                from services.llm_provider import OllamaProvider
+                ollama_model = user_config.get("ollama_model") or app_config.settings.ollama_model
+                request_llm = OllamaProvider(
+                    base_url=app_config.settings.ollama_base_url,
+                    model=ollama_model
+                )
+            elif llm_provider == "gemini":
+                from services.llm_provider import GeminiProvider
+                gemini_model = user_config.get("gemini_model") or app_config.settings.google_base_model
+                request_llm = GeminiProvider(model_name=gemini_model)
+            else:
+                request_llm = create_llm_provider(llm_provider)
+            
+            # Create guardrail with user config
+            if guardrail_provider == "ollama":
+                from services.llm_provider import OllamaProvider
+                ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
+                guardrail_llm = OllamaProvider(
+                    base_url=app_config.settings.ollama_base_url,
+                    model=ollama_guardrail_model
+                )
+            elif guardrail_provider == "gemini":
+                from services.llm_provider import GeminiProvider
+                gemini_guardrail_model = user_config.get("gemini_guardrail_model") or app_config.settings.google_guardrail_model or app_config.settings.google_base_model
+                guardrail_llm = GeminiProvider(model_name=gemini_guardrail_model)
+            else:
+                guardrail_llm = create_llm_provider(guardrail_provider)
+            
+            # Create temporary guardrail service
+            from services.guardrail import GuardrailService
+            request_guardrail = GuardrailService()
+            request_guardrail.llm = guardrail_llm
+            
+            # Create temporary chat service with custom LLM and guardrail
+            from services.chat_service import ChatService
+            request_chat_service = ChatService(mcp_host=mcp_host)
+            request_chat_service.llm = request_llm
+            request_chat_service.guardrail = request_guardrail
+            
+            # Use temporary chat service
+            chat_service_to_use = request_chat_service
+        else:
+            # Use default chat service
+            chat_service_to_use = chat_service
+        
         # Process chat with conversation memory
         # If conversation_id is None, service will automatically create a new one
-        response_text, conversation_id = await chat_service.process_chat(
+        response_text, conversation_id = await chat_service_to_use.process_chat(
             messages,
             request.model,
             conversation_id=conversation_id

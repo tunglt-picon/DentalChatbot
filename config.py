@@ -24,15 +24,15 @@ class Settings(BaseSettings):
     # Ollama server URL (default: localhost)
     ollama_base_url: str = "http://localhost:11434"
     
-    # Ollama model for chat responses (main model)
-    # Popular models: llama3.2, qwen2.5:7b, mistral, phi-3
-    # Default: llama3.2 (~2GB, good quality)
-    ollama_model: str = "llama3.2"
+    # Ollama model for chat responses (main model - heavier for reasoning)
+    # Popular models: llama3.2:3b, qwen2.5:7b, mistral:7b, llama3.1:8b
+    # Default: llama3.2:3b (~2GB, good quality)
+    ollama_model: str = "llama3.2:3b"
     
-    # Ollama model for guardrail (can use lighter model)
-    # Default: llama3.2 (same as main model)
-    # You can use lighter model like phi-3 for faster guardrail checks
-    ollama_guardrail_model: str = "llama3.2"
+    # Ollama model for guardrail (lighter models for fast checks)
+    # Recommended: phi-3 (~2GB), tinyllama (~700MB)
+    # Default: phi-3 (lightweight, fast)
+    ollama_guardrail_model: str = "phi-3"
     
     # ============================================
     # Google Gemini Configuration
@@ -42,13 +42,14 @@ class Settings(BaseSettings):
     google_api_key: Optional[str] = None
     
     # Gemini model for chat responses
-    # Options: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro
-    # Default: gemini-2.5-flash (fast, free tier available)
-    google_base_model: str = "gemini-2.5-flash"
+    # Options: gemini-1.5-flash, gemini-2.5-flash
+    # Default: gemini-1.5-flash (fast, free tier available)
+    google_base_model: str = "gemini-1.5-flash"
     
     # Gemini model for guardrail (optional, defaults to google_base_model)
-    # You can use gemini-2.0-flash for guardrail if different from main model
-    google_guardrail_model: Optional[str] = None
+    # Options: gemini-1.5-flash, gemini-2.5-flash
+    # Default: gemini-1.5-flash (fast for guardrail checks)
+    google_guardrail_model: Optional[str] = "gemini-1.5-flash"
     
     class Config:
         env_file = ".env"

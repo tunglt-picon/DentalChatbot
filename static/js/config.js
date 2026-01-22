@@ -23,6 +23,7 @@ function toggleProviderOptions() {
 function toggleGuardrailOptions() {
     const provider = document.getElementById('guardrailProvider').value;
     document.getElementById('ollamaGuardrailGroup').style.display = provider === 'ollama' ? 'block' : 'none';
+    document.getElementById('geminiGuardrailGroup').style.display = provider === 'gemini' ? 'block' : 'none';
 }
 
 function loadConfig() {
@@ -32,9 +33,10 @@ function loadConfig() {
         const config = JSON.parse(saved);
         document.getElementById('llmProvider').value = config.llm_provider || 'ollama';
         document.getElementById('guardrailProvider').value = config.guardrail_provider || 'ollama';
-        document.getElementById('ollamaChatModel').value = config.ollama_model || 'llama3.2';
-        document.getElementById('ollamaGuardrailModel').value = config.ollama_guardrail_model || 'llama3.2';
-        document.getElementById('geminiChatModel').value = config.gemini_model || 'gemini-2.5-flash';
+        document.getElementById('ollamaChatModel').value = config.ollama_model || 'qwen2.5:7b';
+        document.getElementById('ollamaGuardrailModel').value = config.ollama_guardrail_model || 'phi-3';
+        document.getElementById('geminiChatModel').value = config.gemini_model || 'gemini-1.5-flash';
+        document.getElementById('geminiGuardrailModel').value = config.gemini_guardrail_model || 'gemini-1.5-flash';
         document.getElementById('searchTool').value = config.search_tool || 'duckduckgo';
     }
     toggleProviderOptions();
@@ -51,6 +53,7 @@ async function saveConfig(e) {
         ollama_model: formData.get('ollama_model'),
         ollama_guardrail_model: formData.get('ollama_guardrail_model'),
         gemini_model: formData.get('gemini_model'),
+        gemini_guardrail_model: formData.get('gemini_guardrail_model'),
         search_tool: formData.get('search_tool')
     };
     

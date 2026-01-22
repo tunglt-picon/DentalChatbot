@@ -1,6 +1,33 @@
 version: '3.8'
 
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - dental-chatbot-network
+    # Pull models on startup
+    # Guardrail models (lightweight): phi-3, tinyllama
+    # Chat models (heavier for reasoning): qwen2.5:7b (best Vietnamese), llama3.2:3b (lightweight option)
+    command: >
+      sh -c "
+        ollama serve &
+        sleep 5 &&
+        echo 'Pulling guardrail models (lightweight)...' &&
+        ollama pull phi-3 &&
+        ollama pull tinyllama &&
+        echo 'Pulling chat models (heavier for reasoning)...' &&
+        ollama pull qwen2.5:7b &&
+        ollama pull llama3.2:3b &&
+        echo 'All models pulled successfully!' &&
+        wait
+      "
+
   dental-chatbot-backend:
     build:
       context: .
@@ -14,18 +41,20 @@ services:
       - GUARDRAIL_PROVIDER=${GUARDRAIL_PROVIDER:-ollama}
       
       # Ollama Settings (Default - Recommended)
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
-      - OLLAMA_GUARDRAIL_MODEL=${OLLAMA_GUARDRAIL_MODEL:-llama3.2}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_GUARDRAIL_MODEL=${OLLAMA_GUARDRAIL_MODEL:-phi-3}
       
       # Google Gemini (only if using Gemini)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-2.5-flash}
-      - GOOGLE_GUARDRAIL_MODEL=${GOOGLE_GUARDRAIL_MODEL:-}
+      - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-1.5-flash}
+      - GOOGLE_GUARDRAIL_MODEL=${GOOGLE_GUARDRAIL_MODEL:-gemini-1.5-flash}
     env_file:
       - .env
     volumes:
        - .:/app
+    depends_on:
+      - ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -55,9 +84,9 @@ services:
   #   networks:
   #     - dental-chatbot-network
 
-# volumes:
-#   openwebui-data:
-#     driver: local
+volumes:
+  ollama-data:
+    driver: local
 
 networks:
   dental-chatbot-network:
