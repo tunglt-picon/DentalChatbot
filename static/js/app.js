@@ -108,35 +108,49 @@ function loadChat(chatId) {
 function formatMessageContent(content) {
     if (!content) return '';
     
-    // Step 1: Preserve markdown links and bold text with placeholders
+    // Step 0: Handle if content already has <br> tags (from backend or previous processing)
+    // Convert existing <br> or &lt;br&gt; back to newlines first
+    let workingContent = content
+        .replace(/&lt;br&gt;/gi, '\n')  // Handle escaped <br>
+        .replace(/<br\s*\/?>/gi, '\n')  // Handle <br> or <br/>
+        .replace(/&lt;br\s*\/?&gt;/gi, '\n');  // Handle escaped <br/>
+    
+    // Step 1: Preserve markdown links with placeholders
     const linkPlaceholder = '___LINK_PLACEHOLDER___';
     const linkMap = new Map();
     let linkCounter = 0;
     
-    let formatted = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+    workingContent = workingContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
         const placeholder = `${linkPlaceholder}${linkCounter}`;
         linkMap.set(placeholder, { text: text, url: url });
         linkCounter++;
         return placeholder;
     });
     
+    // Step 2: Preserve bold text with placeholders
     const boldPlaceholder = '___BOLD_PLACEHOLDER___';
     const boldMap = new Map();
     let boldCounter = 0;
     
-    formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, function(match, text) {
+    workingContent = workingContent.replace(/\*\*([^\*]+)\*\*/g, function(match, text) {
         const placeholder = `${boldPlaceholder}${boldCounter}`;
         boldMap.set(placeholder, text);
         boldCounter++;
         return placeholder;
     });
     
-    // Step 2: Convert --- to horizontal rule placeholder BEFORE splitting
+    // Step 3: Convert --- to horizontal rule placeholder
     const hrPlaceholder = '___HR_PLACEHOLDER___';
-    formatted = formatted.replace(/^---$/gm, hrPlaceholder);
+    workingContent = workingContent.replace(/^---$/gm, hrPlaceholder);
     
-    // Step 3: Split by double newlines to create paragraphs
-    const paragraphs = formatted.split(/\n\n+/);
+    // Step 4: Use a unique, safe marker for line breaks that won't be escaped
+    // Use a marker that contains no special regex characters
+    const brMarker = '___BR_MARKER___';
+    workingContent = workingContent.replace(/\r\n|\r|\n/g, brMarker);
+    
+    // Step 5: Split by double+ markers to create paragraphs
+    const doubleBrPattern = new RegExp(brMarker + '{2,}', 'g');
+    const paragraphs = workingContent.split(doubleBrPattern);
     const result = [];
     
     for (let para of paragraphs) {
@@ -149,22 +163,23 @@ function formatMessageContent(content) {
             continue;
         }
         
-        // Convert single \n within paragraph to <br>
-        para = para.replace(/\n/g, '<br>');
-        
-        // Escape HTML (but preserve placeholders)
+        // Escape HTML (markers won't be affected as they don't contain < or >)
         para = para
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
         
-        // Restore bold placeholders (before wrapping in <p>)
+        // NOW replace markers with <br> tags (after escaping, so <br> won't be escaped again)
+        // Use simple string replace since we know the exact marker
+        para = para.split(brMarker).join('<br>');
+        
+        // Restore bold placeholders
         boldMap.forEach((text, placeholder) => {
             const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             para = para.replace(placeholder, `<strong>${escapedText}</strong>`);
         });
         
-        // Restore link placeholders (before wrapping in <p>)
+        // Restore link placeholders
         linkMap.forEach((linkData, placeholder) => {
             const escapedText = linkData.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const escapedUrl = linkData.url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -178,22 +193,49 @@ function formatMessageContent(content) {
         result.push(`<p>${para}</p>`);
     }
     
-    formatted = result.join('');
+    let formatted = result.join('');
+    
+    // Final cleanup: Replace ANY remaining placeholders or markers (multiple passes to be sure)
+    // This handles edge cases where placeholders might not have been replaced
+    let previousFormatted = '';
+    while (formatted !== previousFormatted) {
+        previousFormatted = formatted;
+        formatted = formatted.replace(/___BR_PLACEHOLDER___/g, '<br>');
+        formatted = formatted.replace(/BR_PLACEHOLDER___/g, '<br>');  // Handle partial placeholder
+        formatted = formatted.replace(/___BR_MARKER___/g, '<br>');
+        formatted = formatted.replace(/BR_MARKER___/g, '<br>');  // Handle partial marker
+        formatted = formatted.replace(/___HR_PLACEHOLDER___/g, '<hr>');
+    }
     
     // Fallback: If no paragraphs were created, treat as single paragraph
     if (!formatted.includes('<p>') && !formatted.includes('<hr>')) {
-        formatted = content
+        // Start fresh with original content
+        let fallbackContent = content
+            .replace(/&lt;br&gt;/gi, '\n')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/&lt;br\s*\/?&gt;/gi, '\n');
+        
+        // Preserve links and bold
+        fallbackContent = fallbackContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
+            '<a href="$2" target="_blank" rel="noopener noreferrer" class="source-link">$1</a>');
+        fallbackContent = fallbackContent.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+        
+        // Escape HTML
+        fallbackContent = fallbackContent
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br>');
+            .replace(/>/g, '&gt;');
         
-        // Restore links and bold
-        formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
-            '<a href="$2" target="_blank" rel="noopener noreferrer" class="source-link">$1</a>');
-        formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+        // Restore links and bold (they were escaped, need to restore)
+        fallbackContent = fallbackContent
+            .replace(/&lt;a href="([^"]+)" target="_blank" rel="noopener noreferrer" class="source-link"&gt;([^&]+)&lt;\/a&gt;/g, 
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="source-link">$2</a>')
+            .replace(/&lt;strong&gt;([^&]+)&lt;\/strong&gt;/g, '<strong>$1</strong>');
         
-        formatted = `<p>${formatted}</p>`;
+        // Convert newlines to <br>
+        fallbackContent = fallbackContent.replace(/\r\n|\r|\n/g, '<br>');
+        
+        formatted = `<p>${fallbackContent}</p>`;
     }
     
     return formatted;
@@ -206,8 +248,22 @@ function addMessageToUI(role, content, timestamp = null) {
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    // Use innerHTML to render formatted content with line breaks and links
-    contentDiv.innerHTML = formatMessageContent(content);
+    
+    // Format and set content
+    const formattedContent = formatMessageContent(content);
+    
+    // Debug: Check for any remaining placeholders
+    if (formattedContent.includes('___BR_PLACEHOLDER___') || formattedContent.includes('___BR_MARKER___')) {
+        console.error('[DEBUG] Placeholder still found in formatted content!', formattedContent.substring(0, 200));
+    }
+    if (formattedContent.includes('&lt;br&gt;')) {
+        console.error('[DEBUG] <br> tags are escaped! This should not happen.');
+    }
+    if (formattedContent.includes('<br>')) {
+        console.log('[DEBUG] <br> tags found in formatted content (good)');
+    }
+    
+    contentDiv.innerHTML = formattedContent;
     
     const timeDiv = document.createElement('div');
     timeDiv.className = 'message-time';

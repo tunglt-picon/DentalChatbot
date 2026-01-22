@@ -23,7 +23,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware (if needed for Open WebUI)
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify allowed origins

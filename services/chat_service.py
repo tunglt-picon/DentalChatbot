@@ -23,7 +23,6 @@ def _extract_sources(search_results: str) -> list:
         List of source dictionaries with title and link
     """
     sources = []
-    import re
     
     # Pattern to match "Link: <url>" in search results
     link_pattern = re.compile(r'Link:\s*(https?://[^\s\n]+)', re.IGNORECASE)
@@ -72,7 +71,6 @@ def _format_response(response_text: str, sources: list, user_lang: str) -> str:
     Returns:
         Formatted response with sources
     """
-    import re
     
     # Step 1: Normalize existing line breaks
     response_text = re.sub(r'\r\n', '\n', response_text)  # Windows line breaks
@@ -133,6 +131,8 @@ def _format_response(response_text: str, sources: list, user_lang: str) -> str:
             for idx, source in enumerate(sources, 1):
                 sources_section += f"{idx}. [{source['title']}]({source['link']})\n"
         
+        # Ensure sources section ends with double newline for proper paragraph separation
+        sources_section = sources_section.rstrip() + "\n"
         response_text += sources_section
     
     return response_text
@@ -197,17 +197,17 @@ class ChatService:
             logger.error("[STEP 1.3] No user message found in messages")
             raise ValueError("User message not found")
         
+        # Step 1.5: Detect language ONCE (before guardrail to reuse in guardrail)
+        from services.guardrail import detect_language_llm
+        user_lang = await detect_language_llm(user_message, self.guardrail.llm)
+        logger.info(f"[STEP 1.5] Detected user language: {user_lang}")
+        
         # Step 2: Guardrail check FIRST (before getting context to save resources)
         logger.info(f"[STEP 2] Checking guardrail for question: {user_message[:50]}...")
-        is_dental = await self.guardrail.is_dental_related(user_message)
+        is_dental, user_lang = await self.guardrail.is_dental_related(user_message, user_lang=user_lang)
         logger.info(f"[STEP 2.1] Guardrail result: {'PASSED' if is_dental else 'REJECTED'}")
         if not is_dental:
             logger.warning(f"[STEP 2.2] Guardrail rejected question: {user_message}")
-            
-            # Detect language from user message using LLM
-            from services.guardrail import detect_language_llm
-            user_lang = await detect_language_llm(user_message, self.guardrail.llm)
-            logger.info(f"[STEP 2.2.1] Detected user language: {user_lang}")
             
             friendly_message = PromptManager.get_rejection_message(user_lang)
             
@@ -283,11 +283,8 @@ class ChatService:
         
         # Step 7: Build prompt with conversation context
         logger.debug(f"[STEP 7] Building prompt with {len(all_messages)} messages in context")
-        
-        # Detect language from user message using LLM
-        from services.guardrail import detect_language_llm
-        user_lang = await detect_language_llm(user_message, self.guardrail.llm)
-        logger.info(f"[STEP 7.1] Detected user language: {user_lang}")
+        # user_lang already detected in Step 1.5, reuse it
+        logger.info(f"[STEP 7.1] Using detected user language: {user_lang}")
         
         conversation_summary = ""
         if len(all_messages) > 1:

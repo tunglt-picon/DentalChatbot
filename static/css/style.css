@@ -214,6 +214,7 @@ body {
 
 .message-content p {
     margin: 0.5em 0;
+    white-space: normal;
 }
 
 .message-content p:first-child {
@@ -242,6 +243,21 @@ body {
     border: none;
     border-top: 1px solid #e2e8f0;
     margin: 1em 0;
+}
+
+/* Force <br> tags to create visible line breaks */
+.message-content br {
+    display: block !important;
+    margin: 0.3em 0 !important;
+    line-height: 1.6 !important;
+    content: "" !important;
+    height: 0.3em !important;
+}
+
+.message-content p br {
+    display: block !important;
+    margin: 0.3em 0 !important;
+    height: 0.3em !important;
 }
 
 .message-content strong {

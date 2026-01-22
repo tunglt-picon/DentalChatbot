@@ -1,6 +1,7 @@
 """Guardrail service to check if question is related to dentistry."""
 import logging
 import re
+from typing import Optional, Tuple
 import config
 from services.llm_provider import create_llm_provider
 from services.prompts import PromptManager
@@ -45,73 +46,30 @@ class GuardrailService:
     
     def __init__(self):
         """Initialize GuardrailService with configured LLM provider."""
-        # Use guardrail_provider
         guardrail_provider = config.settings.guardrail_provider
         self.llm = create_llm_provider(guardrail_provider)
-        
-        # Prompt templates for different languages
-        self.prompt_template_en = """
-You are a question moderation system. Your task is to determine if a question belongs to the DENTAL (dentistry) field.
-
-The DENTAL field includes:
-- Teeth, gums, mouth
-- Dental and oral diseases
-- Dental treatments (fillings, extractions, braces, dental implants...)
-- Oral hygiene
-- Orthodontics
-- Dental surgery
-- Cosmetic dentistry
-- Issues like cavities, gingivitis, bad breath...
-- Addresses and dental examination facilities, dental clinics, dentists
-- Finding dentists, dental clinic addresses, dental offices
-
-Question: "{question}"
-
-IMPORTANT: Answer ONLY one word: "YES" if the question is related to dentistry, "NO" if not.
-
-Answer:
-"""
-        
-        self.prompt_template_vi = """
-Bạn là hệ thống kiểm duyệt câu hỏi. Nhiệm vụ của bạn là xác định xem một câu hỏi có thuộc lĩnh vực NHA KHOA (dentistry) hay không.
-
-Lĩnh vực NHA KHOA bao gồm:
-- Răng, nướu, miệng
-- Các bệnh về răng miệng
-- Điều trị nha khoa (trám răng, nhổ răng, niềng răng, cấy ghép răng...)
-- Vệ sinh răng miệng
-- Chỉnh nha
-- Phẫu thuật nha khoa
-- Thẩm mỹ nha khoa
-- Các vấn đề như sâu răng, viêm nướu, hôi miệng...
-- Các địa chỉ, cơ sở khám răng, phòng khám nha khoa, nha sĩ
-- Tìm kiếm nha sĩ, địa chỉ nha khoa, phòng khám răng
-
-Câu hỏi: "{question}"
-
-QUAN TRỌNG: Trả lời CHỈ một từ bằng tiếng Anh: "YES" nếu câu hỏi liên quan đến nha khoa, "NO" nếu không.
-KHÔNG trả lời bằng tiếng Việt (CÓ/KHÔNG). CHỈ trả lời "YES" hoặc "NO".
-
-Trả lời:
-"""
     
-    async def is_dental_related(self, question: str) -> bool:
+    async def is_dental_related(self, question: str, user_lang: Optional[str] = None) -> Tuple[bool, str]:
         """
         Check if question is related to dentistry.
         
         Args:
             question: Question to check
+            user_lang: Optional pre-detected language ("vi" or "en"). If None, will detect.
             
         Returns:
-            True if related to dentistry, False otherwise
+            Tuple of (is_dental_related: bool, user_lang: str)
         """
         logger.debug(f"[GUARDRAIL] Checking question: {question[:100]}...")
         logger.debug(f"[GUARDRAIL] Using provider: {config.settings.guardrail_provider}")
         
         try:
-            # Detect language and get prompt from PromptManager
-            user_lang = await detect_language_llm(question, self.llm)
-            logger.debug(f"[GUARDRAIL] Detected language: {user_lang}")
+            # Detect language if not provided
+            if user_lang is None:
+                user_lang = await detect_language_llm(question, self.llm)
+                logger.debug(f"[GUARDRAIL] Detected language: {user_lang}")
+            else:
+                logger.debug(f"[GUARDRAIL] Using provided language: {user_lang}")
             
             prompt = PromptManager.get_guardrail_prompt(question, user_lang)
             logger.debug(f"[GUARDRAIL] Prompt built, length: {len(prompt)} characters")
@@ -136,10 +94,10 @@ Trả lời:
             # Check for YES/NO in English, or CÓ/KHÔNG in Vietnamese (fallback)
             if "YES" in result or "CÓ" in result:
                 logger.info(f"[GUARDRAIL] Result: YES/CÓ - Question is dental-related")
-                return True
+                return True, user_lang
             elif "NO" in result or "KHÔNG" in result:
                 logger.info(f"[GUARDRAIL] Result: NO/KHÔNG - Question is NOT dental-related")
-                return False
+                return False, user_lang
             else:
                 # If unclear, default to reject (safe)
                 logger.warning(
@@ -147,10 +105,16 @@ Trả lời:
                     f"Expected 'YES' or 'NO' but got: '{response}'. "
                     f"Rejecting question: {question}"
                 )
-                return False
+                return False, user_lang
                 
         except Exception as e:
             logger.error(f"[GUARDRAIL] Error checking guardrail: {e}", exc_info=True)
             # If error occurs, default to reject (safe)
             logger.warning(f"[GUARDRAIL] Defaulting to REJECT due to error")
-            return False
+            # Try to detect language for fallback
+            if user_lang is None:
+                try:
+                    user_lang = await detect_language_llm(question, self.llm)
+                except:
+                    user_lang = "vi"  # Default fallback
+            return False, user_lang

@@ -32,17 +32,15 @@ class Message(BaseModel):
 
 class ChatCompletionRequest(BaseModel):
     """Request model for chat completion."""
-    model_config = ConfigDict(extra="allow")  # Allow extra fields from OpenWebUI
+    model_config = ConfigDict(extra="allow")  # Allow extra fields from custom web interface
     
     model: str
     messages: List[Message]
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = None
     stream: Optional[bool] = False
-    # OpenWebUI sends chat_id in payload
+    # Custom web interface sends chat_id in payload
     chat_id: Optional[str] = None
-    # OpenWebUI background tasks
-    background_tasks: Optional[dict] = None
 
 
 class ChatCompletionResponse(BaseModel):
@@ -59,7 +57,6 @@ class ChatCompletionResponse(BaseModel):
 async def list_models():
     """
     List available models (OpenAI-compatible endpoint).
-    Open WebUI uses this to know what models are available.
     """
     return {
         "object": "list",
@@ -96,29 +93,6 @@ async def chat_completions(request: ChatCompletionRequest):
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         logger.debug(f"[REQUEST] Parsed {len(messages)} messages from request")
         
-        # Check if this is a background task (title generation, follow-up generation, etc.)
-        is_background_task = False
-        if request.background_tasks:
-            is_background_task = any(request.background_tasks.values())
-            logger.debug(f"[REQUEST] Background tasks: {request.background_tasks}")
-        
-        # Also check message content for background task patterns
-        if messages:
-            last_message_content = messages[-1].get("content", "")
-            # OpenWebUI background tasks often have specific prompts
-            background_patterns = [
-                "Generate a concise",
-                "Suggest 3-5 relevant follow-up",
-                "### Task:",
-                "Task:"
-            ]
-            if any(pattern in last_message_content for pattern in background_patterns):
-                is_background_task = True
-                logger.debug(f"[REQUEST] Detected background task pattern in message")
-        
-        if is_background_task:
-            logger.info("[REQUEST] Detected background task, skipping guardrail and search")
-        
         # Get chat_id from payload (if provided)
         request_dump = request.model_dump()
         conversation_id = request.chat_id or request_dump.get("chat_id")
@@ -128,33 +102,6 @@ async def chat_completions(request: ChatCompletionRequest):
             logger.info(f"[REQUEST] Received chat_id from payload: {conversation_id}")
         else:
             logger.warning("[REQUEST] No chat_id in payload, will create new conversation")
-        
-        # For background tasks, return a simple response without processing
-        if is_background_task:
-            logger.info("Skipping full processing for background task")
-            # Return a simple response for background tasks
-            response_data = {
-                "id": f"chatcmpl-bg-{int(time.time())}",
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": request.model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": ""  # Empty content for background tasks
-                        },
-                        "finish_reason": "stop"
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0
-                }
-            }
-            return response_data
         
         # Process chat with conversation memory
         # If conversation_id is None, service will automatically create a new one
@@ -227,7 +174,6 @@ async def chat_completions(request: ChatCompletionRequest):
         }
         
         # Return error response with 200 status (OpenAI-compatible)
-        # OpenWebUI will display the error message to user
         return error_response
         
     except Exception as e:
