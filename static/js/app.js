@@ -104,6 +104,101 @@ function loadChat(chatId) {
     renderChatList();
 }
 
+// Format message content: convert line breaks and markdown links
+function formatMessageContent(content) {
+    if (!content) return '';
+    
+    // Step 1: Preserve markdown links and bold text with placeholders
+    const linkPlaceholder = '___LINK_PLACEHOLDER___';
+    const linkMap = new Map();
+    let linkCounter = 0;
+    
+    let formatted = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+        const placeholder = `${linkPlaceholder}${linkCounter}`;
+        linkMap.set(placeholder, { text: text, url: url });
+        linkCounter++;
+        return placeholder;
+    });
+    
+    const boldPlaceholder = '___BOLD_PLACEHOLDER___';
+    const boldMap = new Map();
+    let boldCounter = 0;
+    
+    formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, function(match, text) {
+        const placeholder = `${boldPlaceholder}${boldCounter}`;
+        boldMap.set(placeholder, text);
+        boldCounter++;
+        return placeholder;
+    });
+    
+    // Step 2: Convert --- to horizontal rule placeholder BEFORE splitting
+    const hrPlaceholder = '___HR_PLACEHOLDER___';
+    formatted = formatted.replace(/^---$/gm, hrPlaceholder);
+    
+    // Step 3: Split by double newlines to create paragraphs
+    const paragraphs = formatted.split(/\n\n+/);
+    const result = [];
+    
+    for (let para of paragraphs) {
+        para = para.trim();
+        if (!para) continue;
+        
+        // Check if it's a horizontal rule
+        if (para === hrPlaceholder) {
+            result.push('<hr>');
+            continue;
+        }
+        
+        // Convert single \n within paragraph to <br>
+        para = para.replace(/\n/g, '<br>');
+        
+        // Escape HTML (but preserve placeholders)
+        para = para
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        
+        // Restore bold placeholders (before wrapping in <p>)
+        boldMap.forEach((text, placeholder) => {
+            const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            para = para.replace(placeholder, `<strong>${escapedText}</strong>`);
+        });
+        
+        // Restore link placeholders (before wrapping in <p>)
+        linkMap.forEach((linkData, placeholder) => {
+            const escapedText = linkData.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escapedUrl = linkData.url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            para = para.replace(
+                placeholder,
+                `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="source-link">${escapedText}</a>`
+            );
+        });
+        
+        // Wrap in <p> tag
+        result.push(`<p>${para}</p>`);
+    }
+    
+    formatted = result.join('');
+    
+    // Fallback: If no paragraphs were created, treat as single paragraph
+    if (!formatted.includes('<p>') && !formatted.includes('<hr>')) {
+        formatted = content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+        
+        // Restore links and bold
+        formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
+            '<a href="$2" target="_blank" rel="noopener noreferrer" class="source-link">$1</a>');
+        formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+        
+        formatted = `<p>${formatted}</p>`;
+    }
+    
+    return formatted;
+}
+
 // Add message to UI
 function addMessageToUI(role, content, timestamp = null) {
     const messageDiv = document.createElement('div');
@@ -111,7 +206,8 @@ function addMessageToUI(role, content, timestamp = null) {
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.textContent = content;
+    // Use innerHTML to render formatted content with line breaks and links
+    contentDiv.innerHTML = formatMessageContent(content);
     
     const timeDiv = document.createElement('div');
     timeDiv.className = 'message-time';

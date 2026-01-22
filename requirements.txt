@@ -1,8 +1,9 @@
+protobuf
 fastapi
 uvicorn[standard]
 google-generativeai
 google-adk
-duckduckgo-search
+ddgs
 python-dotenv
 pydantic
 pydantic-settings

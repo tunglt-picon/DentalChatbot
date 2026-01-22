@@ -120,8 +120,6 @@ async def chat_completions(request: ChatCompletionRequest):
             logger.info("[REQUEST] Detected background task, skipping guardrail and search")
         
         # Get chat_id from payload (if provided)
-        # OpenWebUI sends chat_id in the payload
-        # Try to get from both direct attribute and model dump (in case of parsing issues)
         request_dump = request.model_dump()
         conversation_id = request.chat_id or request_dump.get("chat_id")
         
@@ -192,15 +190,11 @@ async def chat_completions(request: ChatCompletionRequest):
         }
         
         # Add conversation_id to response for conversation continuity
-        # Note: FastAPI response headers should be set via Response object
-        # For now, we include it in the response body metadata
         response_data["system_fingerprint"] = conversation_id
         
         return response_data
         
     except ValueError as e:
-        # This should not happen now as guardrail returns friendly message
-        # But keep for other validation errors
         logger.warning(f"Validation error: {str(e)}")
         error_message = str(e)
         

@@ -209,6 +209,43 @@ body {
     border-radius: 18px;
     word-wrap: break-word;
     line-height: 1.6;
+    white-space: normal; /* Let HTML handle formatting */
+}
+
+.message-content p {
+    margin: 0.5em 0;
+}
+
+.message-content p:first-child {
+    margin-top: 0;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.message-content a,
+.message-content .source-link {
+    color: #4299e1;
+    text-decoration: underline;
+    cursor: pointer;
+    word-break: break-all;
+}
+
+.message-content a:hover,
+.message-content .source-link:hover {
+    color: #3182ce;
+    text-decoration: underline;
+}
+
+.message-content hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 1em 0;
+}
+
+.message-content strong {
+    font-weight: 600;
 }
 
 .message.user .message-content {

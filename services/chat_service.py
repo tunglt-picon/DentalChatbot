@@ -1,64 +1,141 @@
 """Chat Service with MCP (Model Context Protocol) implementation."""
 import logging
-import asyncio
 import re
 from typing import Optional, Tuple
 from mcp.base import MCPHost
 from mcp.servers import MemoryMCPServer, ToolMCPServer
 from services.guardrail import GuardrailService
 from services.llm_provider import create_llm_provider
+from services.prompts import PromptManager
 import config
 
 logger = logging.getLogger(__name__)
 
 
-def detect_language(text: str) -> str:
+def _extract_sources(search_results: str) -> list:
     """
-    Detect language from text (Vietnamese or English).
+    Extract source links from search results.
     
     Args:
-        text: Input text
+        search_results: Formatted search results text
         
     Returns:
-        "vi" for Vietnamese, "en" for English
+        List of source dictionaries with title and link
     """
-    # Vietnamese characters (with diacritics)
-    vietnamese_pattern = re.compile(
-        r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]',
-        re.IGNORECASE
-    )
+    sources = []
+    import re
     
-    # Common Vietnamese words
-    vietnamese_words = [
-        'là', 'và', 'của', 'cho', 'với', 'từ', 'được', 'trong', 'này', 'đó',
-        'có', 'không', 'một', 'như', 'về', 'nếu', 'khi', 'sẽ', 'đã', 'đang',
-        'tôi', 'bạn', 'chúng', 'họ', 'nó', 'các', 'những', 'nhiều', 'ít',
-        'răng', 'nướu', 'miệng', 'nha khoa', 'điều trị', 'bệnh', 'sức khỏe'
-    ]
+    # Pattern to match "Link: <url>" in search results
+    link_pattern = re.compile(r'Link:\s*(https?://[^\s\n]+)', re.IGNORECASE)
+    title_pattern = re.compile(r'Title:\s*([^\n]+)', re.IGNORECASE)
     
-    # Check for Vietnamese characters
-    if vietnamese_pattern.search(text):
-        logger.debug(f"[LANG] Detected Vietnamese (diacritics found)")
-        return "vi"
+    # Split by "---" separator (both with and without newlines)
+    sections = re.split(r'\n*---\n*', search_results)
     
-    # Check for Vietnamese words (case insensitive)
-    text_lower = text.lower()
-    vietnamese_word_count = sum(1 for word in vietnamese_words if word in text_lower)
+    for section in sections:
+        if not section.strip():
+            continue
+            
+        # Extract title and link from each section
+        title_match = title_pattern.search(section)
+        link_match = link_pattern.search(section)
+        
+        if link_match:
+            link = link_match.group(1).strip()
+            # Remove trailing characters that might be part of formatting
+            link = re.sub(r'[^\w\-_./?#=&:]+$', '', link)
+            
+            title = title_match.group(1).strip() if title_match else "Nguồn"
+            # Clean title
+            title = title.strip('"\'')
+            
+            # Avoid duplicates
+            if link and link not in [s.get('link', '') for s in sources]:
+                sources.append({
+                    'title': title,
+                    'link': link
+                })
     
-    # If more than 2 Vietnamese words found, likely Vietnamese
-    if vietnamese_word_count >= 2:
-        logger.debug(f"[LANG] Detected Vietnamese ({vietnamese_word_count} Vietnamese words found)")
-        return "vi"
+    logger.debug(f"[EXTRACT_SOURCES] Extracted {len(sources)} unique sources")
+    return sources
+
+
+def _format_response(response_text: str, sources: list, user_lang: str) -> str:
+    """
+    Format response with proper line breaks and add sources.
     
-    # Check text length - if very short and no Vietnamese indicators, might be English
-    # But if longer and has Vietnamese words, it's Vietnamese
-    if vietnamese_word_count > 0:
-        logger.debug(f"[LANG] Detected Vietnamese (some Vietnamese words found)")
-        return "vi"
+    Args:
+        response_text: Raw response from LLM
+        sources: List of source dictionaries
+        user_lang: User language ("vi" or "en")
+        
+    Returns:
+        Formatted response with sources
+    """
+    import re
     
-    # Default to English
-    logger.debug(f"[LANG] Detected English (default)")
-    return "en"
+    # Step 1: Normalize existing line breaks
+    response_text = re.sub(r'\r\n', '\n', response_text)  # Windows line breaks
+    response_text = re.sub(r'\r', '\n', response_text)  # Old Mac line breaks
+    response_text = re.sub(r'\n{3,}', '\n\n', response_text)  # Multiple newlines -> double
+    
+    # Step 2: Ensure double line breaks after sentences ending with .!?
+    # Match both English and Vietnamese capital letters
+    vietnamese_caps = 'ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ'
+    pattern = f'([.!?])\\s+([A-Z{vietnamese_caps}])'
+    response_text = re.sub(pattern, r'\1\n\n\2', response_text)
+    
+    # Step 3: Add paragraph breaks after numbered/bulleted items (1., 2., -, *, etc.)
+    # Pattern: number or bullet followed by text starting with capital
+    numbered_pattern = f'(\\d+\\.\\s+[^\\n]+)\\n([A-Z{vietnamese_caps}])'
+    response_text = re.sub(numbered_pattern, r'\1\n\n\2', response_text)
+    
+    # Step 4: Add paragraph breaks after bold items (**text**)
+    bold_pattern = r'(\*\*[^\*]+\*\*\.?)\s+([A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ])'
+    response_text = re.sub(bold_pattern, r'\1\n\n\2', response_text)
+    
+    # Step 5: Clean up extra spaces but preserve intentional spacing
+    response_text = re.sub(r'[ \t]+', ' ', response_text)  # Multiple spaces/tabs -> single space
+    response_text = re.sub(r' \n', '\n', response_text)  # Space before newline
+    response_text = re.sub(r'\n ', '\n', response_text)  # Space after newline
+    
+    # Step 6: Ensure proper spacing around line breaks
+    response_text = re.sub(r'\n\n+', '\n\n', response_text)  # Multiple double newlines -> single double
+    
+    # Step 7: If no double newlines exist, try to add them intelligently
+    # Split by single newlines and check if we should combine or separate
+    if '\n\n' not in response_text and '\n' in response_text:
+        lines = response_text.split('\n')
+        formatted_lines = []
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+            formatted_lines.append(line)
+            # Add double newline if next line starts with capital and current doesn't end with punctuation
+            if i < len(lines) - 1:
+                next_line = lines[i + 1].strip()
+                if next_line and next_line[0].isupper() and not line.endswith(('.', '!', '?', ':', ';')):
+                    formatted_lines.append('')  # Add empty line for double newline
+        response_text = '\n\n'.join(formatted_lines)
+    
+    # Step 8: Trim whitespace
+    response_text = response_text.strip()
+    
+    # Step 9: Add sources section if available
+    if sources:
+        if user_lang == "vi":
+            sources_section = "\n\n---\n\n**Nguồn tham khảo:**\n\n"
+            for idx, source in enumerate(sources, 1):
+                sources_section += f"{idx}. [{source['title']}]({source['link']})\n"
+        else:
+            sources_section = "\n\n---\n\n**Sources:**\n\n"
+            for idx, source in enumerate(sources, 1):
+                sources_section += f"{idx}. [{source['title']}]({source['link']})\n"
+        
+        response_text += sources_section
+    
+    return response_text
 
 
 class ChatService:
@@ -127,37 +204,12 @@ class ChatService:
         if not is_dental:
             logger.warning(f"[STEP 2.2] Guardrail rejected question: {user_message}")
             
-            # Detect language from user message
-            user_lang = detect_language(user_message)
+            # Detect language from user message using LLM
+            from services.guardrail import detect_language_llm
+            user_lang = await detect_language_llm(user_message, self.guardrail.llm)
             logger.info(f"[STEP 2.2.1] Detected user language: {user_lang}")
             
-            # Return friendly message in same language as user
-            if user_lang == "vi":
-                friendly_message = (
-                    "Xin chào! Tôi là trợ lý tư vấn nha khoa. "
-                    "Tôi chỉ có thể trả lời các câu hỏi liên quan đến nha khoa như:\n"
-                    "- Răng, nướu, miệng\n"
-                    "- Các bệnh về răng miệng\n"
-                    "- Điều trị nha khoa (trám răng, nhổ răng, niềng răng, cấy ghép răng...)\n"
-                    "- Vệ sinh răng miệng\n"
-                    "- Chỉnh nha\n"
-                    "- Phẫu thuật nha khoa\n"
-                    "- Thẩm mỹ nha khoa\n\n"
-                    "Vui lòng đặt câu hỏi về chủ đề nha khoa để tôi có thể hỗ trợ bạn tốt nhất!"
-                )
-            else:
-                friendly_message = (
-                    "Hello! I am a dental consultation assistant. "
-                    "I can only answer questions related to dentistry such as:\n"
-                    "- Teeth, gums, mouth\n"
-                    "- Dental and oral diseases\n"
-                    "- Dental treatments (fillings, extractions, braces, dental implants...)\n"
-                    "- Oral hygiene\n"
-                    "- Orthodontics\n"
-                    "- Dental surgery\n"
-                    "- Cosmetic dentistry\n\n"
-                    "Please ask questions about dental topics so I can help you best!"
-                )
+            friendly_message = PromptManager.get_rejection_message(user_lang)
             
             # Still save to memory for conversation continuity
             memory_result = await self.memory_client.call_method(
@@ -223,6 +275,7 @@ class ChatService:
             # Extract text from tool result
             search_results = tool_result["content"][0]["text"]
             logger.info(f"[STEP 6.1] Search completed. Results length: {len(search_results)} characters")
+            logger.info(f"[STEP 6.2] Search results (full):\n{search_results}")
         except Exception as e:
             logger.error(f"[STEP 6.2] Error calling tool {tool_name}: {e}", exc_info=True)
             # No fallback - just raise error
@@ -231,8 +284,9 @@ class ChatService:
         # Step 7: Build prompt with conversation context
         logger.debug(f"[STEP 7] Building prompt with {len(all_messages)} messages in context")
         
-        # Detect language from user message
-        user_lang = detect_language(user_message)
+        # Detect language from user message using LLM
+        from services.guardrail import detect_language_llm
+        user_lang = await detect_language_llm(user_message, self.guardrail.llm)
         logger.info(f"[STEP 7.1] Detected user language: {user_lang}")
         
         conversation_summary = ""
@@ -245,47 +299,20 @@ class ChatService:
                     conversation_summary += f"{role}: {msg.get('content', '')}\n"
                 logger.debug(f"[STEP 7.2] Added {len(prev_messages[-5:])} previous messages to context")
         
-        # Build prompt in detected language
-        if user_lang == "vi":
-            prompt = f"""Bạn là một chuyên gia tư vấn nha khoa chuyên nghiệp với kiến thức sâu rộng. 
-Nhiệm vụ của bạn là trả lời câu hỏi của bệnh nhân dựa trên thông tin tìm kiếm và ngữ cảnh cuộc trò chuyện.
-
-{conversation_summary}
-
-Câu hỏi hiện tại của bệnh nhân: {user_message}
-
-Thông tin tìm kiếm:
-{search_results}
-
-Vui lòng trả lời câu hỏi một cách:
-- Chính xác và dựa trên thông tin tìm kiếm
-- Nhất quán với ngữ cảnh cuộc trò chuyện trước đó (nếu có)
-- Dễ hiểu và thân thiện
-- Đề cập đến nguồn tham khảo nếu có sẵn
-- Lưu ý: Nếu thông tin không đầy đủ, đề nghị bệnh nhân tham khảo ý kiến nha sĩ
-
-Trả lời bằng tiếng Việt:"""
-        else:
-            prompt = f"""You are a professional dental consultant with extensive knowledge. 
-Your task is to answer the patient's question based on the search information and conversation context.
-
-{conversation_summary}
-
-Current patient's question: {user_message}
-
-Search information:
-{search_results}
-
-Please answer the question in a way that is:
-- Accurate and based on search information
-- Consistent with previous conversation context (if any)
-- Easy to understand and friendly
-- Mentions reference sources if available
-- Note: If information is incomplete, suggest the patient consult a dentist
-
-Answer in English:"""
+        # Extract sources from search results
+        sources = _extract_sources(search_results)
+        logger.debug(f"[STEP 7.3] Extracted {len(sources)} sources from search results")
         
-        logger.debug(f"[STEP 7.2] Prompt built. Length: {len(prompt)} characters")
+        # Build prompt using PromptManager
+        prompt = PromptManager.get_chat_response_prompt(
+            user_message=user_message,
+            search_results=search_results,
+            conversation_summary=conversation_summary,
+            language=user_lang
+        )
+        
+        logger.info(f"[STEP 7.4] Prompt built. Length: {len(prompt)} characters")
+        logger.info(f"[STEP 7.5] Full prompt content:\n{prompt}")
         
         # Step 8: Generate response with LLM
         logger.info(f"[STEP 8] Generating response with LLM provider: {config.settings.llm_provider}")
@@ -293,8 +320,14 @@ Answer in English:"""
             # Use async LLM provider
             response_text = await self.llm.generate(prompt)
             logger.info(f"[STEP 8.1] LLM response generated. Length: {len(response_text)} characters")
+            logger.info(f"[STEP 8.2] Raw LLM response (full):\n{response_text}")
+            
+            # Format response: ensure proper line breaks and add sources
+            response_text = _format_response(response_text, sources, user_lang)
+            logger.info(f"[STEP 8.3] Response formatted. Final length: {len(response_text)} characters")
+            logger.info(f"[STEP 8.4] Formatted response with sources (full):\n{response_text}")
         except Exception as e:
-            logger.error(f"[STEP 8.2] Error generating response from LLM: {e}", exc_info=True)
+            logger.error(f"[STEP 8.3] Error generating response from LLM: {e}", exc_info=True)
             raise Exception(f"Error generating response: {str(e)}")
         
         # Step 9: MCP - Save messages to Memory Server (only after successful response)

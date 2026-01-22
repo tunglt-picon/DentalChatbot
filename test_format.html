@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Format Message</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-content {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .message-content {
+            padding: 15px 20px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.6;
+            white-space: normal;
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+        .message-content p {
+            margin: 0.5em 0;
+        }
+        .message-content p:first-child {
+            margin-top: 0;
+        }
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+        .message-content a {
+            color: #4299e1;
+            text-decoration: underline;
+        }
+        .message-content hr {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 1em 0;
+        }
+        .message-content strong {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Format Message Content</h1>
+    
+    <div class="test-content">
+        <h2>Original Content (with \n\n):</h2>
+        <pre id="original"></pre>
+    </div>
+    
+    <div class="test-content">
+        <h2>Formatted Content (HTML):</h2>
+        <div class="message-content" id="formatted"></div>
+    </div>
+
+    <script>
+        // Copy formatMessageContent function from app.js
+        function formatMessageContent(content) {
+            if (!content) return '';
+            
+            const linkPlaceholder = '___LINK_PLACEHOLDER___';
+            const linkMap = new Map();
+            let linkCounter = 0;
+            
+            let formatted = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+                const placeholder = `${linkPlaceholder}${linkCounter}`;
+                linkMap.set(placeholder, { text: text, url: url });
+                linkCounter++;
+                return placeholder;
+            });
+            
+            const boldPlaceholder = '___BOLD_PLACEHOLDER___';
+            const boldMap = new Map();
+            let boldCounter = 0;
+            
+            formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, function(match, text) {
+                const placeholder = `${boldPlaceholder}${boldCounter}`;
+                boldMap.set(placeholder, text);
+                boldCounter++;
+                return placeholder;
+            });
+            
+            const hrPlaceholder = '___HR_PLACEHOLDER___';
+            formatted = formatted.replace(/^---$/gm, hrPlaceholder);
+            
+            const paragraphs = formatted.split(/\n\n+/);
+            const result = [];
+            
+            for (let para of paragraphs) {
+                para = para.trim();
+                if (!para) continue;
+                
+                if (para === hrPlaceholder) {
+                    result.push('<hr>');
+                    continue;
+                }
+                
+                para = para.replace(/\n/g, '<br>');
+                
+                para = para
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                
+                boldMap.forEach((text, placeholder) => {
+                    const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    para = para.replace(placeholder, `<strong>${escapedText}</strong>`);
+                });
+                
+                linkMap.forEach((linkData, placeholder) => {
+                    const escapedText = linkData.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const escapedUrl = linkData.url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    para = para.replace(
+                        placeholder,
+                        `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="source-link">${escapedText}</a>`
+                    );
+                });
+                
+                result.push(`<p>${para}</p>`);
+            }
+            
+            formatted = result.join('');
+            
+            if (!formatted.includes('<p>') && !formatted.includes('<hr>')) {
+                formatted = content
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>');
+                
+                formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, 
+                    '<a href="$2" target="_blank" rel="noopener noreferrer" class="source-link">$1</a>');
+                formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+                
+                formatted = `<p>${formatted}</p>`;
+            }
+            
+            return formatted;
+        }
+
+        // Test content
+        const testContent = `Để đối phó với răng sâu, bạn cần thực hiện một số biện pháp sau:\n\nSử dụng kem đánh răng chuyên dụng chống ê buốt răng như Sensodyne giúp giảm ê buốt răng lâu dài.\n\nBạn nên đánh răng hai lần mỗi ngày để giữ cho răng và miệng sạch sẽ.\n\nThực hiện xỉa răng hàng ngày bằng chổi hoặc bông chải mềm, tránh dùng chỉ ăn mòn hoặc chất tẩy trắng quá mạnh có thể gây hại cho răng.\n\nTránh ăn thực phẩm có độ acidic cao như thực phẩm có chứa axit, soda, nước ngọt có ga... vì chúng có thể làm giảm độ pH của miệng và khiến răng trở nên dễ bị sâu hơn.\n\nĐi khám định kỳ để bác sĩ kiểm tra và xử lý sớm tình trạng răng sâu.\n\nBác sĩ cũng có thể tư vấn cho bạn cách chăm sóc răng miệng hiệu quả.\n\nNếu bạn đang gặp vấn đề với răng hàm dưới, bạn nên đi khám để được tư vấn cụ thể về cách khắc phục.\n\n---\n\n**Nguồn tham khảo:**\n\n1. [răng hàm dưới em bị sâu bể nhưng còn chân răng thì có cách nào ...](https://www.facebook.com/groups/370646444645899/posts/1166848891692313/)\n2. [[PDF] Bịt Răng - California Dental Association (CDA)](https://www.cda.org/wp-content/uploads/sealants_viet.pdf)\n3. [Sensodyne: Bảo vệ lâu dài khỏi tình trạng ê buốt răng](https://www.sensodyne.com/vi-vn/)\n4. [[PDF] Thông tin cho các bà mẹ và người sắp làm mẹ!](https://www.cda.org/wp-content/uploads/new_moms_viet.pdf)\n5. [CHIA SẺ CỦA BÁC SĨ NGUYỄN THỊ ÁNH HỒNG - Facebook](https://www.facebook.com/nhakhoasmilehcm/videos/chia-sẻ-của-bác-sĩ-nguyễn-thị-ánh-hồng-chuyên-mảng-răng-trẻ-em𝗖𝗵𝘂̉-đ𝗲̂̀-𝗖𝗮́𝗰𝗵-𝗹𝗮/594951382159634/)\n`;
+
+        document.getElementById('original').textContent = testContent;
+        document.getElementById('formatted').innerHTML = formatMessageContent(testContent);
+        
+        console.log('Original paragraphs:', testContent.split('\\n\\n').length);
+        console.log('Formatted HTML:', formatMessageContent(testContent));
+    </script>
+</body>
+</html>

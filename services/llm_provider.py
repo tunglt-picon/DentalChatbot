@@ -44,10 +44,12 @@ class GeminiProvider(LLMProvider):
         model_to_use = self.guardrail_model_instance if use_guardrail_model else self.model
         model_name = self.guardrail_model if use_guardrail_model else self.model_name
         logger.info(f"[GEMINI] Generating response with model: {model_name}, prompt length: {len(prompt)}")
+        logger.info(f"[GEMINI] Full prompt content:\n{prompt}")
         try:
             response = model_to_use.generate_content(prompt)
             result = response.text
             logger.info(f"[GEMINI] Generation completed. Response length: {len(result)} characters")
+            logger.info(f"[GEMINI] Full response content:\n{result}")
             return result
         except Exception as e:
             logger.error(f"[GEMINI] Error: {e}", exc_info=True)
@@ -74,24 +76,29 @@ class OllamaProvider(LLMProvider):
         """Generate using Ollama."""
         model_to_use = self.guardrail_model if use_guardrail_model else self.model
         logger.info(f"[OLLAMA] Generating with model: {model_to_use}, prompt length: {len(prompt)}")
+        logger.info(f"[OLLAMA] Full prompt content:\n{prompt}")
         
         try:
             import httpx
             async with httpx.AsyncClient(timeout=60.0) as client:
                 logger.debug(f"[OLLAMA] Sending request to {self.base_url}/api/generate")
+                request_payload = {
+                    "model": model_to_use,
+                    "prompt": prompt,
+                    "stream": False
+                }
+                logger.debug(f"[OLLAMA] Request payload (model, stream only): model={model_to_use}, stream=False")
+                
                 response = await client.post(
                     f"{self.base_url}/api/generate",
-                    json={
-                        "model": model_to_use,
-                        "prompt": prompt,
-                        "stream": False
-                    }
+                    json=request_payload
                 )
                 logger.debug(f"[OLLAMA] Response status: {response.status_code}")
                 response.raise_for_status()
                 data = response.json()
                 result = data.get("response", "")
                 logger.info(f"[OLLAMA] Generation completed. Response length: {len(result)} characters")
+                logger.info(f"[OLLAMA] Full response content:\n{result}")
                 return result
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
