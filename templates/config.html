@@ -130,10 +130,13 @@
                     <div class="form-group" id="geminiGuardrailGroup" style="display: none;">
                         <label for="geminiGuardrailModel">Gemini Model (Guardrail):</label>
                         <select id="geminiGuardrailModel" name="gemini_guardrail_model">
-                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier)</option>
+                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier, Recommended)</option>
                             <option value="gemini-2.5-flash">gemini-2.5-flash (Faster, Free Tier)</option>
                         </select>
-                        <small>Fast models for guardrail checks</small>
+                        <small>
+                            <strong>gemini-1.5-flash</strong>: Fast, stable, good for guardrail checks<br>
+                            <strong>gemini-2.5-flash</strong>: Faster, newer version, also free tier
+                        </small>
                     </div>
                 </div>
                 

@@ -22,8 +22,27 @@ function toggleProviderOptions() {
 
 function toggleGuardrailOptions() {
     const provider = document.getElementById('guardrailProvider').value;
-    document.getElementById('ollamaGuardrailGroup').style.display = provider === 'ollama' ? 'block' : 'none';
-    document.getElementById('geminiGuardrailGroup').style.display = provider === 'gemini' ? 'block' : 'none';
+    const ollamaGroup = document.getElementById('ollamaGuardrailGroup');
+    const geminiGroup = document.getElementById('geminiGuardrailGroup');
+    
+    if (!ollamaGroup || !geminiGroup) {
+        console.error('Guardrail groups not found!');
+        return;
+    }
+    
+    if (provider === 'ollama') {
+        ollamaGroup.style.display = 'block';
+        geminiGroup.style.display = 'none';
+    } else if (provider === 'gemini') {
+        ollamaGroup.style.display = 'none';
+        geminiGroup.style.display = 'block';
+    } else {
+        // Default: hide both
+        ollamaGroup.style.display = 'none';
+        geminiGroup.style.display = 'none';
+    }
+    
+    console.log(`Guardrail provider changed to: ${provider}, showing ${provider === 'ollama' ? 'Ollama' : 'Gemini'} options`);
 }
 
 function loadConfig() {
@@ -39,8 +58,17 @@ function loadConfig() {
         document.getElementById('geminiGuardrailModel').value = config.gemini_guardrail_model || 'gemini-1.5-flash';
         document.getElementById('searchTool').value = config.search_tool || 'duckduckgo';
     }
+    
+    // Toggle options AFTER setting values (important!)
     toggleProviderOptions();
     toggleGuardrailOptions();
+    
+    // Debug logging
+    const guardrailProvider = document.getElementById('guardrailProvider')?.value;
+    const geminiGroup = document.getElementById('geminiGuardrailGroup');
+    console.log('Config loaded - Guardrail provider:', guardrailProvider);
+    console.log('Gemini guardrail group found:', !!geminiGroup);
+    console.log('Gemini guardrail group display:', geminiGroup?.style.display);
 }
 
 async function saveConfig(e) {
