@@ -184,8 +184,10 @@ class ChatService:
         """
         logger.info(f"[STEP 1] Starting chat processing - Model: {model}, Conversation ID: {conversation_id}")
         
-        # Step 1: Extract user message from incoming messages (before any processing)
-        logger.debug(f"[STEP 1.1] Extracting user message from {len(messages)} messages")
+        # Step 1: Extract user message from incoming messages
+        # Note: Frontend only sends the new user message (not full history)
+        # Full context will be retrieved from memory in Step 4
+        logger.debug(f"[STEP 1.1] Extracting user message from {len(messages)} message(s)")
         user_message = None
         for msg in reversed(messages):
             if msg.get("role") == "user":
@@ -249,16 +251,15 @@ class ChatService:
         memory_context = context_result.get("messages", [])
         logger.info(f"[STEP 4.1] Retrieved {len(memory_context)} messages from memory")
         
-        # Step 5: Merge incoming messages with memory context
-        logger.debug(f"[STEP 5] Merging messages - Memory: {len(memory_context)}, Incoming: {len(messages)}")
+        # Step 5: Build context from memory + new user message
+        # Note: Frontend only sends the new user message, not full history
+        # Backend retrieves full context from memory (single source of truth)
+        logger.debug(f"[STEP 5] Building context - Memory: {len(memory_context)} messages, New user message: {user_message[:50]}...")
         all_messages = memory_context.copy()
         
-        # Add user message if not already in context
-        if not all_messages or all_messages[-1].get("content") != user_message:
-            all_messages.append({"role": "user", "content": user_message})
-            logger.debug(f"[STEP 5.1] Added user message to context. Total messages: {len(all_messages)}")
-        else:
-            logger.debug(f"[STEP 5.1] User message already in context, skipping")
+        # Add new user message to context
+        all_messages.append({"role": "user", "content": user_message})
+        logger.debug(f"[STEP 5.1] Context built. Total messages: {len(all_messages)}")
         
         # Step 6: MCP - Call search tool via Tool Server
         tool_name = "google_search" if model == "dental-google" else "duckduckgo_search"

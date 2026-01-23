@@ -324,7 +324,7 @@ async function sendMessage() {
         // Find current chat
         const currentChat = chats.find(c => c.id === currentChatId);
         
-        // Add user message to chat
+        // Add user message to chat (for UI display)
         currentChat.messages.push({
             role: 'user',
             content: message,
@@ -334,7 +334,8 @@ async function sendMessage() {
         // Get current config and include in request
         const config = getCurrentConfig();
         
-        // Call API
+        // Call API - Only send the NEW user message
+        // Backend will retrieve full context from memory using chat_id
         const response = await fetch(`${API_BASE}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -342,10 +343,11 @@ async function sendMessage() {
             },
             body: JSON.stringify({
                 model: currentModel,
-                messages: currentChat.messages.map(m => ({
-                    role: m.role,
-                    content: m.content
-                })),
+                // Only send the new user message - backend will get context from memory
+                messages: [{
+                    role: 'user',
+                    content: message
+                }],
                 chat_id: currentChatId,
                 // Include config in request so backend can use it
                 config: config

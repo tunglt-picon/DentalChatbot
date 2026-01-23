@@ -90,8 +90,10 @@ async def chat_completions(request: ChatCompletionRequest):
         logger.info(f"[REQUEST] Received chat completion request - Model: {request.model}")
         
         # Convert Pydantic models to dict for service
+        # Note: Frontend only sends the new user message, not full history
+        # Backend will retrieve full context from memory using chat_id
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        logger.debug(f"[REQUEST] Parsed {len(messages)} messages from request")
+        logger.debug(f"[REQUEST] Parsed {len(messages)} message(s) from request (should be 1 new user message)")
         
         # Get chat_id and config from payload (if provided)
         request_dump = request.model_dump()
