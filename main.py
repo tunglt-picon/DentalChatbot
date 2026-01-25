@@ -80,8 +80,6 @@ class ConfigRequest(BaseModel):
     guardrail_provider: str
     ollama_model: Optional[str] = None
     ollama_guardrail_model: Optional[str] = None
-    gemini_model: Optional[str] = None
-    search_tool: str
 
 
 @app.post("/api/config")
@@ -100,7 +98,7 @@ async def get_config():
         "llm_provider": app_config.settings.llm_provider,
         "guardrail_provider": app_config.settings.guardrail_provider,
         "ollama_model": app_config.settings.ollama_model,
-        "search_tool": "duckduckgo"  # Default
+        "ollama_guardrail_model": app_config.settings.ollama_guardrail_model
     })
 
 

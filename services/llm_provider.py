@@ -1,4 +1,4 @@
-"""LLM Provider abstraction layer for multiple providers."""
+"""LLM Provider abstraction layer for Ollama."""
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -14,46 +14,6 @@ class LLMProvider(ABC):
     async def generate(self, prompt: str) -> str:
         """Generate text from prompt."""
         pass
-
-
-class GeminiProvider(LLMProvider):
-    """Google Gemini provider."""
-    
-    def __init__(self, model_name: Optional[str] = None, guardrail_model: Optional[str] = None):
-        """
-        Initialize Gemini provider.
-        
-        Args:
-            model_name: Model name for chat (defaults to google_base_model)
-            guardrail_model: Model name for guardrail (defaults to google_guardrail_model or model_name)
-        """
-        if not config.settings.google_api_key:
-            raise ValueError("Google API key is required for Gemini provider")
-        
-        self.model_name = model_name or config.settings.google_base_model
-        self.guardrail_model = guardrail_model or config.settings.google_guardrail_model or self.model_name
-        
-        logger.info(f"[GEMINI] Initializing with model: {self.model_name}, guardrail model: {self.guardrail_model}")
-        import google.generativeai as genai
-        genai.configure(api_key=config.settings.google_api_key)
-        self.model = genai.GenerativeModel(self.model_name)
-        self.guardrail_model_instance = genai.GenerativeModel(self.guardrail_model) if self.guardrail_model != self.model_name else self.model
-    
-    async def generate(self, prompt: str, use_guardrail_model: bool = False) -> str:
-        """Generate using Gemini."""
-        model_to_use = self.guardrail_model_instance if use_guardrail_model else self.model
-        model_name = self.guardrail_model if use_guardrail_model else self.model_name
-        logger.info(f"[GEMINI] Generating response with model: {model_name}, prompt length: {len(prompt)}")
-        logger.info(f"[GEMINI] Full prompt content:\n{prompt}")
-        try:
-            response = model_to_use.generate_content(prompt)
-            result = response.text
-            logger.info(f"[GEMINI] Generation completed. Response length: {len(result)} characters")
-            logger.info(f"[GEMINI] Full response content:\n{result}")
-            return result
-        except Exception as e:
-            logger.error(f"[GEMINI] Error: {e}", exc_info=True)
-            raise
 
 
 class OllamaProvider(LLMProvider):
@@ -80,7 +40,9 @@ class OllamaProvider(LLMProvider):
         
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            # Increase timeout for larger models (qwen2.5:7b-instruct can take longer)
+            timeout_duration = 180.0 if "7b" in model_to_use or "8b" in model_to_use else 120.0
+            async with httpx.AsyncClient(timeout=timeout_duration) as client:
                 logger.debug(f"[OLLAMA] Sending request to {self.base_url}/api/generate")
                 request_payload = {
                     "model": model_to_use,
@@ -123,7 +85,7 @@ def create_llm_provider(provider_type: str = "ollama") -> LLMProvider:
     Factory function to create LLM provider.
     
     Args:
-        provider_type: "ollama" or "gemini"
+        provider_type: "ollama" (only supported provider)
     
     Returns:
         LLMProvider instance
@@ -137,10 +99,5 @@ def create_llm_provider(provider_type: str = "ollama") -> LLMProvider:
         guardrail_model = getattr(config.settings, 'ollama_guardrail_model', 'llama3.2')
         logger.info(f"Ollama config - Base URL: {base_url}, Model: {model}, Guardrail Model: {guardrail_model}")
         return OllamaProvider(base_url=base_url, model=model, guardrail_model=guardrail_model)
-    elif provider_type == "gemini":
-        logger.info("Creating Gemini provider")
-        model_name = getattr(config.settings, 'google_base_model', 'gemini-2.5-flash')
-        guardrail_model = getattr(config.settings, 'google_guardrail_model', None)
-        return GeminiProvider(model_name=model_name, guardrail_model=guardrail_model)
     else:
-        raise ValueError(f"Unknown provider type: {provider_type}. Supported: 'ollama', 'gemini'")
+        raise ValueError(f"Unknown provider type: {provider_type}. Only 'ollama' is supported.")

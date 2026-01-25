@@ -61,7 +61,6 @@ async def list_models():
     return {
         "object": "list",
         "data": [
-            {"id": "dental-google", "object": "model", "owned_by": "me"},
             {"id": "dental-duckduckgo", "object": "model", "owned_by": "me"},
         ]
     }
@@ -79,11 +78,11 @@ async def chat_completions(request: ChatCompletionRequest):
     import time
     
     # Validate model
-    valid_models = ["dental-google", "dental-duckduckgo"]
+    valid_models = ["dental-duckduckgo"]
     if request.model not in valid_models:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid model. Must be one of: {', '.join(valid_models)}"
+            detail=f"Invalid model. Must be: {valid_models[0]}"
         )
     
     try:
@@ -107,51 +106,39 @@ async def chat_completions(request: ChatCompletionRequest):
             logger.warning("[REQUEST] No chat_id in payload, will create new conversation")
         
         # Apply user config if provided (override environment variables for this request)
+        # Only Ollama is supported, ignore any other provider settings
         if user_config:
             logger.info(f"[REQUEST] Applying user config: {user_config}")
             # Create a temporary config override
             import config as app_config
-            from services.llm_provider import create_llm_provider
+            from services.llm_provider import OllamaProvider
             from services.guardrail import GuardrailService
             
-            # Get config values (use user config if provided, else use defaults)
-            llm_provider = user_config.get("llm_provider") or app_config.settings.llm_provider
-            guardrail_provider = user_config.get("guardrail_provider") or app_config.settings.guardrail_provider
+            # Force Ollama provider (ignore any gemini/google config from old localStorage)
+            # Get Ollama model from user config or use default
+            ollama_model = user_config.get("ollama_model") or app_config.settings.ollama_model
+            ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
             
-            # Create LLM provider with user config
-            if llm_provider == "ollama":
-                from services.llm_provider import OllamaProvider
-                ollama_model = user_config.get("ollama_model") or app_config.settings.ollama_model
-                request_llm = OllamaProvider(
-                    base_url=app_config.settings.ollama_base_url,
-                    model=ollama_model
-                )
-            elif llm_provider == "gemini":
-                from services.llm_provider import GeminiProvider
-                gemini_model = user_config.get("gemini_model") or app_config.settings.google_base_model
-                request_llm = GeminiProvider(model_name=gemini_model)
-            else:
-                request_llm = create_llm_provider(llm_provider)
+            # Create LLM provider with Ollama (only supported provider)
+            request_llm = OllamaProvider(
+                base_url=app_config.settings.ollama_base_url,
+                model=ollama_model
+            )
             
-            # Create guardrail with user config
-            if guardrail_provider == "ollama":
-                from services.llm_provider import OllamaProvider
-                ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
-                guardrail_llm = OllamaProvider(
-                    base_url=app_config.settings.ollama_base_url,
-                    model=ollama_guardrail_model
-                )
-            elif guardrail_provider == "gemini":
-                from services.llm_provider import GeminiProvider
-                gemini_guardrail_model = user_config.get("gemini_guardrail_model") or app_config.settings.google_guardrail_model or app_config.settings.google_base_model
-                guardrail_llm = GeminiProvider(model_name=gemini_guardrail_model)
-            else:
-                guardrail_llm = create_llm_provider(guardrail_provider)
+            # Create guardrail with Ollama (only supported provider)
+            # Note: For guardrail, we use the guardrail_model as the main model
+            # since guardrail always uses use_guardrail_model=True
+            guardrail_llm = OllamaProvider(
+                base_url=app_config.settings.ollama_base_url,
+                model=ollama_guardrail_model,
+                guardrail_model=ollama_guardrail_model  # Explicitly set guardrail_model
+            )
             
-            # Create temporary guardrail service
+            # Create temporary guardrail service with custom LLM (skip default initialization)
             from services.guardrail import GuardrailService
-            request_guardrail = GuardrailService()
+            request_guardrail = GuardrailService.__new__(GuardrailService)  # Create without __init__
             request_guardrail.llm = guardrail_llm
+            logger.info(f"[REQUEST] Using guardrail model: {ollama_guardrail_model} (from user config)")
             
             # Create temporary chat service with custom LLM and guardrail
             from services.chat_service import ChatService

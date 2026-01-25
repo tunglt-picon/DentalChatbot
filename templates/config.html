@@ -108,35 +108,17 @@
             <div id="statusMessage" class="status-message"></div>
             
             <form id="configForm">
-                <!-- Guardrail Model - MOVED TO TOP -->
+                <!-- Guardrail Model -->
                 <div class="config-section">
                     <h3>🛡️ Guardrail Model (for checking if question is dental-related)</h3>
                     <div class="form-group">
-                        <label for="guardrailProvider">Guardrail Provider:</label>
-                        <select id="guardrailProvider" name="guardrail_provider">
-                            <option value="ollama" selected>Ollama (Recommended)</option>
-                            <option value="gemini">Google Gemini</option>
-                        </select>
-                        <small>Model used to check if questions are dental-related</small>
-                    </div>
-                    <div class="form-group" id="ollamaGuardrailGroup">
                         <label for="ollamaGuardrailModel">Ollama Model (Guardrail - Lightweight):</label>
                         <select id="ollamaGuardrailModel" name="ollama_guardrail_model">
-                            <option value="phi-3" selected>phi-3 (Very Light, ~2GB, Fast)</option>
-                            <option value="tinyllama">tinyllama (Ultra Light, ~700MB, Fastest)</option>
+                            <option value="phi3:latest" selected>phi3:latest (2.2GB, Fast & Efficient - Recommended)</option>
+                            <option value="qwen2.5:3b-instruct">qwen2.5:3b-instruct (1.9GB, Lightweight, Good Vietnamese Support)</option>
+                            <option value="llama3.2:latest">llama3.2:latest (2.0GB, Lightweight & Fast)</option>
                         </select>
-                        <small>Lightweight models recommended for fast guardrail checks</small>
-                    </div>
-                    <div class="form-group" id="geminiGuardrailGroup" style="display: none;">
-                        <label for="geminiGuardrailModel">Gemini Model (Guardrail):</label>
-                        <select id="geminiGuardrailModel" name="gemini_guardrail_model">
-                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier, Recommended)</option>
-                            <option value="gemini-2.5-flash">gemini-2.5-flash (Faster, Free Tier)</option>
-                        </select>
-                        <small>
-                            <strong>gemini-1.5-flash</strong>: Fast, stable, good for guardrail checks<br>
-                            <strong>gemini-2.5-flash</strong>: Faster, newer version, also free tier
-                        </small>
+                        <small>Lightweight models recommended for fast guardrail checks. phi3:latest is optimized for quick responses. qwen2.5:3b-instruct offers good Vietnamese support.</small>
                     </div>
                 </div>
                 
@@ -144,44 +126,17 @@
                 <div class="config-section">
                     <h3>💬 Chat Model (for generating responses)</h3>
                     <div class="form-group">
-                        <label for="llmProvider">LLM Provider:</label>
-                        <select id="llmProvider" name="llm_provider">
-                            <option value="ollama" selected>Ollama (Recommended - Free, No Limits)</option>
-                            <option value="gemini">Google Gemini (Free - Limited)</option>
-                        </select>
-                        <small>Model used for generating chat responses after search</small>
-                    </div>
-                    <div class="form-group" id="ollamaChatGroup">
                         <label for="ollamaChatModel">Ollama Model (Chat - Heavy for Reasoning):</label>
                         <select id="ollamaChatModel" name="ollama_model">
-                            <option value="qwen2.5:7b" selected>qwen2.5:7b (Best Vietnamese Support, ~4.5GB, Recommended)</option>
-                            <option value="llama3.2:3b">llama3.2:3b (Lightweight & Fast, ~2GB, Good Quality)</option>
+                            <option value="qwen2.5:7b-instruct" selected>qwen2.5:7b-instruct (4.7GB, Best Vietnamese Support - Recommended)</option>
+                            <option value="qwen2.5:3b-instruct">qwen2.5:3b-instruct (1.9GB, Lighter, Still Good Quality)</option>
+                            <option value="llama3.2:latest">llama3.2:latest (2.0GB, Lightweight & Fast)</option>
                         </select>
                         <small>
-                            <strong>qwen2.5:7b</strong>: Best for Vietnamese, excellent reasoning, high quality responses<br>
-                            <strong>llama3.2:3b</strong>: Faster, lighter, good quality, suitable for lower-end hardware
+                            <strong>qwen2.5:7b-instruct</strong>: Best for Vietnamese, excellent reasoning, highest quality responses (recommended)<br>
+                            <strong>qwen2.5:3b-instruct</strong>: Lighter option, still good Vietnamese support, faster inference<br>
+                            <strong>llama3.2:latest</strong>: Fastest option, good quality, suitable for lower-end hardware
                         </small>
-                    </div>
-                    <div class="form-group" id="geminiChatGroup" style="display: none;">
-                        <label for="geminiChatModel">Gemini Model (Chat):</label>
-                        <select id="geminiChatModel" name="gemini_model">
-                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Fast, Free Tier)</option>
-                            <option value="gemini-2.5-flash">gemini-2.5-flash (Faster, Free Tier)</option>
-                        </select>
-                        <small>Model to use for Gemini provider</small>
-                    </div>
-                </div>
-                
-                <!-- Search Tool -->
-                <div class="config-section">
-                    <h3>Search Tool</h3>
-                    <div class="form-group">
-                        <label for="searchTool">Default Search Tool:</label>
-                        <select id="searchTool" name="search_tool">
-                            <option value="duckduckgo">DuckDuckGo (Free, Unlimited)</option>
-                            <option value="google">Google Search (ADK - Requires Gemini 2.0+)</option>
-                        </select>
-                        <small>Search engine to use for finding information</small>
                     </div>
                 </div>
                 
@@ -190,6 +145,6 @@
         </div>
     </div>
     
-    <script src="/static/js/config.js"></script>
+    <script src="/static/js/config.js?v=2"></script>
 </body>
 </html>

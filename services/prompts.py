@@ -13,44 +13,23 @@ Text: "{text}"
 Answer:"""
     
     # Guardrail prompts
-    GUARDRAIL_EN = """You are a question moderation system. Your task is to determine if a question belongs to the DENTAL (dentistry) field.
+    GUARDRAIL_EN = """Is this question about DENTISTRY?
 
-The DENTAL field includes:
-- Teeth, gums, mouth
-- Dental and oral diseases
-- Dental treatments (fillings, extractions, braces, dental implants...)
-- Oral hygiene
-- Orthodontics
-- Dental surgery
-- Cosmetic dentistry
-- Issues like cavities, gingivitis, bad breath...
-- Addresses and dental examination facilities, dental clinics, dentists
-- Finding dentists, dental clinic addresses, dental offices
+DENTISTRY includes: teeth, gums, mouth, dental treatment, finding dental clinics/dentists, dental addresses.
 
 Question: "{question}"
 
-IMPORTANT: Answer ONLY one word: "YES" if the question is related to dentistry, "NO" if not.
+Answer ONLY one word: "YES" if dental-related, "NO" if not.
 
 Answer:"""
     
-    GUARDRAIL_VI = """Bạn là hệ thống kiểm duyệt câu hỏi. Nhiệm vụ của bạn là xác định xem một câu hỏi có thuộc lĩnh vực NHA KHOA (dentistry) hay không.
+    GUARDRAIL_VI = """Câu hỏi có liên quan đến NHA KHOA không?
 
-Lĩnh vực NHA KHOA bao gồm:
-- Răng, nướu, miệng
-- Các bệnh về răng miệng
-- Điều trị nha khoa (trám răng, nhổ răng, niềng răng, cấy ghép răng...)
-- Vệ sinh răng miệng
-- Chỉnh nha
-- Phẫu thuật nha khoa
-- Thẩm mỹ nha khoa
-- Các vấn đề như sâu răng, viêm nướu, hôi miệng...
-- Các địa chỉ, cơ sở khám răng, phòng khám nha khoa, nha sĩ
-- Tìm kiếm nha sĩ, địa chỉ nha khoa, phòng khám răng
+NHA KHOA bao gồm: răng, nướu, miệng, điều trị nha khoa, tìm địa chỉ/phòng khám nha khoa, nha sĩ.
 
 Câu hỏi: "{question}"
 
-QUAN TRỌNG: Trả lời CHỈ một từ bằng tiếng Anh: "YES" nếu câu hỏi liên quan đến nha khoa, "NO" nếu không.
-KHÔNG trả lời bằng tiếng Việt (CÓ/KHÔNG). CHỈ trả lời "YES" hoặc "NO".
+Trả lời CHỈ một từ: "YES" nếu liên quan nha khoa, "NO" nếu không.
 
 Trả lời:"""
     
@@ -69,21 +48,21 @@ Vui lòng trả lời câu hỏi một cách:
 - Chính xác và dựa trên thông tin tìm kiếm
 - Nhất quán với ngữ cảnh cuộc trò chuyện trước đó (nếu có)
 - Dễ hiểu và thân thiện
-- Format đẹp với các đoạn văn rõ ràng
+- Format đẹp với các đoạn văn rõ ràng, dễ đọc
 
 QUAN TRỌNG VỀ FORMAT: 
 - Mỗi đoạn văn phải được phân tách bằng HAI dấu xuống dòng (\\n\\n)
-- Sau mỗi câu kết thúc bằng dấu chấm (.), chấm hỏi (?), hoặc chấm than (!), nếu bắt đầu câu mới thì phải xuống dòng
-- Các mục trong danh sách (1., 2., 3., hoặc -, *) phải cách nhau bằng hai dấu xuống dòng
-- Mỗi đoạn văn nên là một ý tưởng hoàn chỉnh
+- Mỗi đoạn văn nên là một ý tưởng hoàn chỉnh, độc lập
+- Sau mỗi câu kết thúc bằng dấu chấm (.), chấm hỏi (?), hoặc chấm than (!), nếu bắt đầu đoạn văn mới thì phải có HAI dấu xuống dòng
+- Các mục trong danh sách (1., 2., 3., hoặc -, *) phải cách nhau bằng hai dấu xuống dòng nếu là các ý tưởng riêng biệt
 - Không cần thêm dẫn chứng nguồn trong phần trả lời chính (sẽ được thêm tự động sau)
 
-VÍ DỤ FORMAT ĐÚNG:
-Đoạn văn đầu tiên về chủ đề.
+VÍ DỤ FORMAT ĐÚNG (về nha khoa):
+Sâu răng là một vấn đề phổ biến ở mọi lứa tuổi. Nguyên nhân chính là do vi khuẩn trong miệng tạo ra axit từ đường và tinh bột, làm mòn men răng theo thời gian.
 
-Đoạn văn thứ hai về chủ đề khác.
+Để phòng ngừa sâu răng, bạn nên đánh răng ít nhất 2 lần mỗi ngày với kem đánh răng có fluoride. Ngoài ra, hạn chế ăn đồ ngọt và uống nhiều nước cũng rất quan trọng để giữ cho miệng sạch sẽ.
 
-Đoạn văn thứ ba với thông tin bổ sung.
+Nếu bạn đã bị sâu răng, nha sĩ sẽ tiến hành trám răng để ngăn chặn sâu răng lan rộng. Quá trình này thường không đau và có thể hoàn thành trong một lần hẹn.
 
 Trả lời:"""
     
@@ -101,21 +80,21 @@ Please answer the question in a way that is:
 - Accurate and based on search information
 - Consistent with previous conversation context (if any)
 - Easy to understand and friendly
-- Well-formatted with clear paragraphs
+- Well-formatted with clear, readable paragraphs
 
 IMPORTANT FORMATTING:
 - Each paragraph MUST be separated by TWO newlines (\\n\\n)
-- After each sentence ending with period (.), question mark (?), or exclamation (!), if starting a new sentence, add a line break
-- List items (1., 2., 3., or -, *) must be separated by two newlines
-- Each paragraph should be a complete idea
+- Each paragraph should be a complete, independent idea
+- After each sentence ending with period (.), question mark (?), or exclamation (!), if starting a new paragraph, add TWO newlines
+- List items (1., 2., 3., or -, *) must be separated by two newlines if they are separate ideas
 - Do not include source citations in the main answer (they will be added automatically)
 
-EXAMPLE OF CORRECT FORMAT:
-First paragraph about the topic.
+EXAMPLE OF CORRECT FORMAT (dental-related):
+Tooth decay is a common problem at all ages. The main cause is bacteria in the mouth producing acid from sugar and starch, which erodes tooth enamel over time.
 
-Second paragraph about a different topic.
+To prevent tooth decay, you should brush your teeth at least twice daily with fluoride toothpaste. Additionally, limiting sugary foods and drinking plenty of water is also very important to keep your mouth clean.
 
-Third paragraph with additional information.
+If you already have tooth decay, your dentist will perform a filling to prevent the decay from spreading. This process is usually painless and can be completed in one appointment.
 
 Answer:"""
     

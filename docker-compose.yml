@@ -40,15 +40,10 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - GUARDRAIL_PROVIDER=${GUARDRAIL_PROVIDER:-ollama}
       
-      # Ollama Settings (Default - Recommended)
+      # Ollama Settings
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
       - OLLAMA_GUARDRAIL_MODEL=${OLLAMA_GUARDRAIL_MODEL:-phi-3}
-      
-      # Google Gemini (only if using Gemini)
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - GOOGLE_BASE_MODEL=${GOOGLE_BASE_MODEL:-gemini-1.5-flash}
-      - GOOGLE_GUARDRAIL_MODEL=${GOOGLE_GUARDRAIL_MODEL:-gemini-1.5-flash}
     env_file:
       - .env
     volumes:
@@ -75,7 +70,7 @@ services:
   #   environment:
   #     - OPENAI_API_BASE_URL=http://dental-chatbot-backend:8000/v1
   #     - WEBUI_AUTH=${WEBUI_AUTH:-false}
-  #     - DEFAULT_MODELS=dental-google,dental-duckduckgo
+  #     - DEFAULT_MODELS=dental-duckduckgo
   #   volumes:
   #     - openwebui-data:/app/backend/data
   #   depends_on:

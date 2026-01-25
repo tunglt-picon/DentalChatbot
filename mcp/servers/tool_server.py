@@ -24,20 +24,6 @@ class ToolMCPServer(MCPServer):
         """List available search tools."""
         return [
             {
-                "name": "google_search",
-                "description": "Search using Google ADK google_search tool (Gemini 2.0+ with Google Search grounding)",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query"
-                        }
-                    },
-                    "required": ["query"]
-                }
-            },
-            {
                 "name": "duckduckgo_search",
                 "description": "Search using DuckDuckGo (free, unlimited)",
                 "inputSchema": {
@@ -71,27 +57,19 @@ class ToolMCPServer(MCPServer):
         Handle tools/call request.
         
         Args:
-            name: Tool name (google_search or duckduckgo_search)
+            name: Tool name (duckduckgo_search)
             arguments: Tool arguments
         """
         query = arguments.get("query")
         if not query:
             raise ValueError("Query is required")
         
-        # Map tool name to model
-        model_mapping = {
-            "google_search": "dental-google",
-            "duckduckgo_search": "dental-duckduckgo"
-        }
-        
-        if name not in model_mapping:
-            raise ValueError(f"Unknown tool: {name}")
-        
-        model = model_mapping[name]
+        if name != "duckduckgo_search":
+            raise ValueError(f"Unknown tool: {name}. Only 'duckduckgo_search' is supported.")
         
         try:
             # Get search tool via factory
-            search_tool = SearchToolFactory.create_search_tool(model)
+            search_tool = SearchToolFactory.create_search_tool()
             results = await search_tool.search(query)
             
             return {

@@ -6,22 +6,17 @@ Backend API for Dental Chatbot using FastAPI with Ollama LLM (free, no rate limi
 
 - ✅ **Built-in Web Interface**: Simple and clean chat interface with configuration page
 - ✅ **OpenAI-Compatible API**: Complies with OpenAI API standard
-- ✅ **Dual Search Strategies**: 
-  - `dental-google`: Uses Google ADK google_search tool
-  - `dental-duckduckgo`: Uses DuckDuckGo (free, unlimited)
+- ✅ **Search Tool**: Uses DuckDuckGo (free, unlimited)
 - ✅ **Guardrail System**: Automatically checks if questions belong to the dental field
-- ✅ **Multiple LLM Providers**: Supports Ollama (default), Groq, Gemini, Hugging Face
+- ✅ **LLM Provider**: Ollama (free, no rate limits, runs locally)
 - ✅ **Configuration Page**: Web UI to configure models and search tools
 - ✅ **Clean Architecture**: Implements Factory Pattern, MCP architecture
 
 ## Technology Stack
 
 - **Framework**: FastAPI
-- **LLM**: Ollama (default - free, no rate limits)
-  - Alternative: Groq, Gemini, Hugging Face
-- **Search Tools**:
-  - `google-adk`: Google Agent Development Kit with google_search tool
-  - `duckduckgo-search`: Python library for DuckDuckGo
+- **LLM**: Ollama (free, no rate limits, runs locally)
+- **Search Tool**: DuckDuckGo (free, unlimited)
 - **Configuration**: `python-dotenv`, `pydantic-settings`
 
 ## Installation
@@ -76,11 +71,6 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 OLLAMA_GUARDRAIL_MODEL=llama3.2
 
-# Optional: Google Gemini (only if using Gemini)
-GOOGLE_API_KEY=your_google_api_key_here
-
-# Optional: Groq (only if using Groq)
-GROQ_API_KEY=your_groq_api_key_here
 ```
 
 ### 6. Start Ollama (if not running)
@@ -116,7 +106,6 @@ Open browser: `http://localhost:8000`
 
 ### Chat Page (`/`)
 
-- Select search tool (Google/DuckDuckGo)
 - Chat with the dental assistant
 - View chat history
 - Continue previous conversations
@@ -124,9 +113,8 @@ Open browser: `http://localhost:8000`
 ### Configuration Page (`/config`)
 
 Configure:
-- **Chat Model**: LLM provider and model for generating responses
-- **Guardrail Model**: Model for checking if questions are dental-related
-- **Search Tool**: Default search engine (Google/DuckDuckGo)
+- **Chat Model**: Ollama model for generating responses
+- **Guardrail Model**: Ollama model for checking if questions are dental-related
 
 ## API Endpoints
 
@@ -139,7 +127,6 @@ List available models (OpenAI-compatible).
 {
   "object": "list",
   "data": [
-    {"id": "dental-google", "object": "model", "owned_by": "me"},
     {"id": "dental-duckduckgo", "object": "model", "owned_by": "me"}
   ]
 }
@@ -217,28 +204,6 @@ OLLAMA_MODEL=llama3.2
 OLLAMA_GUARDRAIL_MODEL=llama3.2
 ```
 
-### Groq (Alternative)
-
-**Advantages:**
-- ✅ Free tier: 30 requests/second
-- ✅ Very fast inference
-- ✅ Good quality models
-
-**Configuration:**
-```env
-LLM_PROVIDER=groq
-GROQ_API_KEY=your_key_here
-GROQ_MODEL=llama-3.1-8b-instant
-```
-
-### Google Gemini (Alternative)
-
-**Configuration:**
-```env
-LLM_PROVIDER=gemini
-GOOGLE_API_KEY=your_key_here
-GOOGLE_BASE_MODEL=gemini-2.5-flash
-```
 
 ## Docker Setup
 
@@ -288,7 +253,6 @@ DentalChatbot/
 │   └── memory.py          # Memory service
 └── tools/
     ├── base.py            # BaseSearchTool interface
-    ├── google_search.py   # Google ADK search tool
     ├── duckduckgo_search.py  # DuckDuckGo search
     └── factory.py         # Search tool factory
 ```
@@ -315,9 +279,7 @@ ollama pull qwen2.5:7b
 
 ### Rate Limit Errors
 
-- If using Ollama: No rate limits, check if Ollama is running
-- If using Groq: Check API key and rate limit (30 req/s)
-- If using Gemini: Free tier has strict limits, consider switching to Ollama
+- Ollama has no rate limits, check if Ollama is running
 
 ## License
 

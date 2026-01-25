@@ -75,8 +75,8 @@ class GuardrailService:
             logger.debug(f"[GUARDRAIL] Prompt built, length: {len(prompt)} characters")
             
             # Use guardrail model if supported
-            from services.llm_provider import OllamaProvider, GeminiProvider
-            if isinstance(self.llm, (OllamaProvider, GeminiProvider)):
+            from services.llm_provider import OllamaProvider
+            if isinstance(self.llm, OllamaProvider):
                 logger.debug(f"[GUARDRAIL] Using guardrail-specific model")
                 response = await self.llm.generate(prompt, use_guardrail_model=True)
             else:
@@ -88,21 +88,29 @@ class GuardrailService:
             logger.info(f"[GUARDRAIL] Full prompt sent to LLM:\n{prompt}")
             logger.info(f"[GUARDRAIL] Full response from LLM:\n{response}")
             
-            result = response.strip().upper()
+            # Extract first word/line from response and normalize
+            first_line = response.strip().split('\n')[0].strip().upper()
+            first_word = first_line.split()[0] if first_line.split() else ""
             
-            # Handle response that may have additional text
-            # Check for YES/NO in English, or CÓ/KHÔNG in Vietnamese (fallback)
-            if "YES" in result or "CÓ" in result:
-                logger.info(f"[GUARDRAIL] Result: YES/CÓ - Question is dental-related")
-                return True, user_lang
-            elif "NO" in result or "KHÔNG" in result:
-                logger.info(f"[GUARDRAIL] Result: NO/KHÔNG - Question is NOT dental-related")
+            # Check for NO first (more restrictive, safer)
+            if first_word == "NO" or first_line.startswith("NO"):
+                logger.info(f"[GUARDRAIL] Result: NO - Question is NOT dental-related")
                 return False, user_lang
+            elif "NO" in first_line or "KHÔNG" in first_line:
+                logger.info(f"[GUARDRAIL] Result: NO/KHÔNG (fallback) - Question is NOT dental-related")
+                return False, user_lang
+            # Then check for YES
+            elif first_word == "YES" or first_line.startswith("YES"):
+                logger.info(f"[GUARDRAIL] Result: YES - Question is dental-related")
+                return True, user_lang
+            elif "YES" in first_line or "CÓ" in first_line:
+                logger.info(f"[GUARDRAIL] Result: YES/CÓ (fallback) - Question is dental-related")
+                return True, user_lang
             else:
                 # If unclear, default to reject (safe)
                 logger.warning(
-                    f"[GUARDRAIL] Unclear result: '{result}'. "
-                    f"Expected 'YES' or 'NO' but got: '{response}'. "
+                    f"[GUARDRAIL] Unclear result: '{first_line}'. "
+                    f"Expected 'YES' or 'NO' but got: '{response[:100]}...'. "
                     f"Rejecting question: {question}"
                 )
                 return False, user_lang

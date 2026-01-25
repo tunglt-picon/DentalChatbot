@@ -148,7 +148,7 @@ class ChatService:
         Args:
             mcp_host: MCP Host instance (creates new with servers if None)
         """
-        # Use configured LLM provider instead of hardcoded Gemini
+        # Use configured LLM provider (Ollama)
         self.llm = create_llm_provider(config.settings.llm_provider)
         self.guardrail = GuardrailService()
         
@@ -262,7 +262,7 @@ class ChatService:
         logger.debug(f"[STEP 5.1] Context built. Total messages: {len(all_messages)}")
         
         # Step 6: MCP - Call search tool via Tool Server
-        tool_name = "google_search" if model == "dental-google" else "duckduckgo_search"
+        tool_name = "duckduckgo_search"
         logger.info(f"[STEP 6] Calling search tool: {tool_name} for query: {user_message[:50]}...")
         
         try:

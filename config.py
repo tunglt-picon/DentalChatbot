@@ -1,21 +1,25 @@
 """Application configuration."""
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
 class Settings(BaseSettings):
     """Application settings from environment variables."""
     
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra fields from .env (e.g., old Google/Gemini configs)
+    )
+    
     # ============================================
     # LLM Provider Selection
     # ============================================
-    # Options: "ollama" or "gemini"
-    # Default: "ollama" (free, no rate limits, runs locally)
+    # Only Ollama is supported
     llm_provider: str = "ollama"
     
     # Guardrail Provider (for checking if question is dental-related)
-    # Options: "ollama" or "gemini"
-    # Default: "ollama" (can use lighter model to save resources)
+    # Only Ollama is supported
     guardrail_provider: str = "ollama"
     
     # ============================================
@@ -25,35 +29,16 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     
     # Ollama model for chat responses (main model - heavier for reasoning)
-    # Popular models: llama3.2:3b, qwen2.5:7b, mistral:7b, llama3.1:8b
-    # Default: llama3.2:3b (~2GB, good quality)
-    ollama_model: str = "llama3.2:3b"
+    # Best: qwen2.5:7b-instruct (4.7GB, excellent Vietnamese support)
+    # Alternative: qwen2.5:3b-instruct (1.9GB, lighter), llama3.2:latest (2.0GB)
+    # Default: qwen2.5:7b-instruct (best quality for Vietnamese)
+    ollama_model: str = "qwen2.5:7b-instruct"
     
     # Ollama model for guardrail (lighter models for fast checks)
-    # Recommended: phi-3 (~2GB), tinyllama (~700MB)
-    # Default: phi-3 (lightweight, fast)
-    ollama_guardrail_model: str = "phi-3"
-    
-    # ============================================
-    # Google Gemini Configuration
-    # ============================================
-    # Google Gemini API Key (required only if using Gemini)
-    # Get from: https://makersuite.google.com/app/apikey
-    google_api_key: Optional[str] = None
-    
-    # Gemini model for chat responses
-    # Options: gemini-1.5-flash, gemini-2.5-flash
-    # Default: gemini-1.5-flash (fast, free tier available)
-    google_base_model: str = "gemini-1.5-flash"
-    
-    # Gemini model for guardrail (optional, defaults to google_base_model)
-    # Options: gemini-1.5-flash, gemini-2.5-flash
-    # Default: gemini-1.5-flash (fast for guardrail checks)
-    google_guardrail_model: Optional[str] = "gemini-1.5-flash"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Best: phi3:latest (2.2GB, fast and efficient)
+    # Alternative: llama3.2:latest (2.0GB, also good)
+    # Default: phi3:latest (lightweight, fast for guardrail checks)
+    ollama_guardrail_model: str = "phi3:latest"
 
 
 settings = Settings()

@@ -4,14 +4,13 @@ const API_BASE = '/v1';
 // State
 let currentChatId = null;
 let chats = [];
-let currentModel = 'dental-duckduckgo';
+let currentModel = 'dental-duckduckgo'; // Only DuckDuckGo is supported
 
 // DOM Elements
 const chatMessages = document.getElementById('chatMessages');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
 const btnNewChat = document.getElementById('btnNewChat');
-const modelSelect = document.getElementById('modelSelect');
 const chatList = document.getElementById('chatList');
 const chatTitle = document.getElementById('chatTitle');
 const currentModelSpan = document.getElementById('currentModel');
@@ -33,6 +32,28 @@ function loadConfig() {
     }
 }
 
+// Get current config from localStorage
+function getCurrentConfig() {
+    const saved = localStorage.getItem('dentalChatbot_config');
+    if (saved) {
+        const config = JSON.parse(saved);
+        // Clean config: remove any gemini/google/search_tool fields and force Ollama
+        return {
+            llm_provider: 'ollama',
+            guardrail_provider: 'ollama',
+            ollama_model: config.ollama_model || 'qwen2.5:7b-instruct',
+            ollama_guardrail_model: config.ollama_guardrail_model || 'phi3:latest'
+        };
+    }
+    // Return default config if none saved
+    return {
+        llm_provider: 'ollama',
+        guardrail_provider: 'ollama',
+        ollama_model: 'qwen2.5:7b-instruct',
+        ollama_guardrail_model: 'phi3:latest'
+    };
+}
+
 // Event Listeners
 function setupEventListeners() {
     sendButton.addEventListener('click', sendMessage);
@@ -43,10 +64,6 @@ function setupEventListeners() {
         }
     });
     btnNewChat.addEventListener('click', createNewChat);
-    modelSelect.addEventListener('change', (e) => {
-        currentModel = e.target.value;
-        updateModelIndicator();
-    });
 }
 
 // Load chat history from localStorage
@@ -414,11 +431,7 @@ function showError(message) {
 
 // Update model indicator
 function updateModelIndicator() {
-    const modelNames = {
-        'dental-google': 'Google Search',
-        'dental-duckduckgo': 'DuckDuckGo Search'
-    };
-    currentModelSpan.textContent = modelNames[currentModel] || currentModel;
+    currentModelSpan.textContent = 'DuckDuckGo Search';
 }
 
 // Generate chat ID
