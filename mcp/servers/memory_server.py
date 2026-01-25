@@ -24,6 +24,10 @@ class MemoryMCPServer(MCPServer):
         
         # Memory management methods
         self.register_method("memory/get_context", self._get_context)
+        self.register_method("memory/get_all_messages", self._get_all_messages)
+        self.register_method("memory/get_old_messages", self._get_old_messages)
+        self.register_method("memory/get_or_create_summary", self._get_or_create_summary)
+        self.register_method("memory/set_summary", self._set_summary)
         self.register_method("memory/add_message", self._add_message)
         self.register_method("memory/get_or_create", self._get_or_create)
         self.register_method("memory/get_summary", self._get_summary)
@@ -81,9 +85,69 @@ class MemoryMCPServer(MCPServer):
         }
     
     async def _get_context(self, conversation_id: str, max_messages: Optional[int] = None) -> Dict[str, Any]:
-        """Get conversation context."""
+        """Get conversation context (only recent messages for LLM context)."""
         context = self.memory_service.get_conversation_context(conversation_id, max_messages)
         return {"messages": context}
+    
+    async def _get_all_messages(self, conversation_id: str) -> Dict[str, Any]:
+        """Get ALL messages in conversation (full history for display)."""
+        all_messages = self.memory_service.get_all_messages(conversation_id)
+        return {"messages": all_messages}
+    
+    async def _get_old_messages(self, conversation_id: str) -> Dict[str, Any]:
+        """Get old messages that should be summarized."""
+        old_messages, total_count = self.memory_service.get_old_messages(conversation_id)
+        return {
+            "messages": old_messages,
+            "total_count": total_count
+        }
+    
+    async def _get_or_create_summary(
+        self,
+        conversation_id: str,
+        old_messages: List[Dict],
+        language: str = "vi"
+    ) -> Dict[str, Any]:
+        """
+        Get or create summary of old messages.
+        
+        Args:
+            conversation_id: Conversation ID
+            old_messages: List of old messages to summarize
+            language: Language for summary ("vi" or "en")
+        """
+        # Check if summary already exists
+        conv = self.memory_service.conversations.get(conversation_id)
+        if conv and conv.summary:
+            # Summary exists, return it
+            # Note: Old messages may have been deleted after summarization (compression)
+            return {"summary": conv.summary}
+        
+        # If no old messages, return empty summary
+        if not old_messages:
+            return {"summary": ""}
+        
+        # Summary needs to be created by chat_service (it has LLM access)
+        # This method just returns empty, chat_service will create and save it
+        return {"summary": ""}
+    
+    async def _set_summary(
+        self,
+        conversation_id: str,
+        summary: str,
+        compress: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Set summary for conversation.
+        Optionally compress (delete old messages) after summarizing.
+        
+        Args:
+            conversation_id: Conversation ID
+            summary: Summary text
+            compress: If True, delete old messages after summarizing (default: True)
+        """
+        self.memory_service.set_conversation_summary(conversation_id, summary, compress=compress)
+        return {"status": "success", "conversation_id": conversation_id}
     
     async def _add_message(self, conversation_id: str, role: str, content: str) -> Dict[str, Any]:
         """Add message to conversation."""
@@ -96,9 +160,9 @@ class MemoryMCPServer(MCPServer):
         return {"conversation_id": conv_id}
     
     async def _get_summary(self, conversation_id: str) -> Dict[str, Any]:
-        """Get conversation summary."""
-        summary = self.memory_service.get_conversation_summary(conversation_id)
-        return {"summary": summary}
+        """Get conversation summary text (if exists)."""
+        summary_text = self.memory_service.get_conversation_summary_text(conversation_id)
+        return {"summary": summary_text or ""}
     
     async def _clear(self, conversation_id: str) -> Dict[str, Any]:
         """Clear conversation."""

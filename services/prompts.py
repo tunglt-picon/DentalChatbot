@@ -1,5 +1,5 @@
 """Centralized prompt management for the dental chatbot."""
-from typing import Dict
+from typing import Dict, List
 
 
 class PromptManager:
@@ -57,13 +57,6 @@ QUAN TRỌNG VỀ FORMAT:
 - Các mục trong danh sách (1., 2., 3., hoặc -, *) phải cách nhau bằng hai dấu xuống dòng nếu là các ý tưởng riêng biệt
 - Không cần thêm dẫn chứng nguồn trong phần trả lời chính (sẽ được thêm tự động sau)
 
-VÍ DỤ FORMAT ĐÚNG (về nha khoa):
-Sâu răng là một vấn đề phổ biến ở mọi lứa tuổi. Nguyên nhân chính là do vi khuẩn trong miệng tạo ra axit từ đường và tinh bột, làm mòn men răng theo thời gian.
-
-Để phòng ngừa sâu răng, bạn nên đánh răng ít nhất 2 lần mỗi ngày với kem đánh răng có fluoride. Ngoài ra, hạn chế ăn đồ ngọt và uống nhiều nước cũng rất quan trọng để giữ cho miệng sạch sẽ.
-
-Nếu bạn đã bị sâu răng, nha sĩ sẽ tiến hành trám răng để ngăn chặn sâu răng lan rộng. Quá trình này thường không đau và có thể hoàn thành trong một lần hẹn.
-
 Trả lời:"""
     
     CHAT_RESPONSE_EN = """You are a professional dental consultant with extensive knowledge. 
@@ -89,13 +82,6 @@ IMPORTANT FORMATTING:
 - List items (1., 2., 3., or -, *) must be separated by two newlines if they are separate ideas
 - Do not include source citations in the main answer (they will be added automatically)
 
-EXAMPLE OF CORRECT FORMAT (dental-related):
-Tooth decay is a common problem at all ages. The main cause is bacteria in the mouth producing acid from sugar and starch, which erodes tooth enamel over time.
-
-To prevent tooth decay, you should brush your teeth at least twice daily with fluoride toothpaste. Additionally, limiting sugary foods and drinking plenty of water is also very important to keep your mouth clean.
-
-If you already have tooth decay, your dentist will perform a filling to prevent the decay from spreading. This process is usually painless and can be completed in one appointment.
-
 Answer:"""
     
     # Guardrail rejection messages
@@ -116,7 +102,31 @@ Vui lòng nhập lại câu hỏi liên quan đến nha khoa để tôi có th�
 - Other dental issues
 
 Please re-enter a dental-related question so I can assist you best."""
-    
+
+    # Summarization prompts - for summarizing a single response
+    SUMMARIZE_RESPONSE_VI = """Hãy tóm tắt câu trả lời sau đây về nha khoa thành một đoạn văn ngắn. Tóm tắt phải:
+    - Ngắn gọn, chỉ nêu các điểm chính
+    - Giữ lại thông tin quan trọng
+    - Không quá 2-3 câu
+    - Bằng tiếng Việt
+
+    Câu hỏi: {question}
+    Câu trả lời: {response}
+
+    Tóm tắt:"""
+
+    SUMMARIZE_RESPONSE_EN = """Please summarize the following dental response into a short paragraph. Summary must:
+    - Be concise, only mention key points
+    - Retain important information
+    - Not exceed 2-3 sentences
+    - Be in English
+
+    Question: {question}
+    Response: {response}
+
+    Summary:"""
+
+
     @staticmethod
     def get_language_detection_prompt(text: str) -> str:
         """Get language detection prompt."""
@@ -155,3 +165,17 @@ Please re-enter a dental-related question so I can assist you best."""
         if language == "vi":
             return PromptManager.REJECTION_VI
         return PromptManager.REJECTION_EN
+
+    @staticmethod
+    def get_summarize_response_prompt(question: str, response: str, language: str = "vi") -> str:
+        """
+        Get prompt to summarize a single response (question + answer pair).
+        
+        Args:
+            question: User question
+            response: Assistant response
+            language: Language for summary ("vi" or "en")
+        """
+        if language == "vi":
+            return PromptManager.SUMMARIZE_RESPONSE_VI.format(question=question, response=response)
+        return PromptManager.SUMMARIZE_RESPONSE_EN.format(question=question, response=response)

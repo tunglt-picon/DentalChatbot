@@ -5,7 +5,7 @@ from typing import List, Optional
 import logging
 import config as app_config
 from services.chat_service import ChatService
-from mcp.base import MCPHost
+from clients.mcp_client import MCPHost
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,9 @@ async def chat_completions(request: ChatCompletionRequest):
             ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
             
             # Create LLM provider with Ollama (only supported provider)
+            # Log config explicitly with user config values
+            logger.info(f"[REQUEST] Creating LLM provider: ollama")
+            logger.info(f"[REQUEST] Ollama config - Base URL: {app_config.settings.ollama_base_url}, Model: {ollama_model}, Guardrail Model: {ollama_guardrail_model}")
             request_llm = OllamaProvider(
                 base_url=app_config.settings.ollama_base_url,
                 model=ollama_model
@@ -138,7 +141,13 @@ async def chat_completions(request: ChatCompletionRequest):
             
             # Create temporary chat service with custom LLM and guardrail
             from services.chat_service import ChatService
-            request_chat_service = ChatService(mcp_host=mcp_host)
+            # Create ChatService without calling __init__ to avoid creating default LLM/guardrail
+            request_chat_service = ChatService.__new__(ChatService)
+            # Setup MCP host
+            request_chat_service.mcp_host = mcp_host
+            request_chat_service.memory_client = mcp_host.memory_client
+            request_chat_service.tool_client = mcp_host.tool_client
+            # Set custom LLM and guardrail
             request_chat_service.llm = request_llm
             request_chat_service.guardrail = request_guardrail
             
@@ -256,14 +265,16 @@ async def chat_completions(request: ChatCompletionRequest):
 @router.get("/v1/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str):
     """
-    Get conversation context (using MCP).
+    Get full conversation history (all messages, including old ones).
+    This is for display purposes - full history is always preserved.
+    Uses memory/get_all_messages to retrieve complete history.
     """
     try:
         memory_client = mcp_host.get_client("memory-server")
         
-        # Get context via MCP HTTP server
-        context_result = await memory_client.call_method(
-            "memory/get_context",
+        # Get FULL history via MCP HTTP server (for display)
+        all_messages_result = await memory_client.call_method(
+            "memory/get_all_messages",
             {"conversation_id": conversation_id}
         )
         
@@ -280,7 +291,7 @@ async def get_conversation(conversation_id: str):
         
         return {
             "conversation_id": conversation_id,
-            "messages": context_result.get("messages", []),
+            "messages": all_messages_result.get("messages", []),  # Full history
             "summary": summary
         }
     except HTTPException:

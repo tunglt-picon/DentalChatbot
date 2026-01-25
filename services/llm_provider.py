@@ -80,24 +80,27 @@ class OllamaProvider(LLMProvider):
 
 
 
-def create_llm_provider(provider_type: str = "ollama") -> LLMProvider:
+def create_llm_provider(provider_type: str = "ollama", log_config: bool = True) -> LLMProvider:
     """
     Factory function to create LLM provider.
     
     Args:
         provider_type: "ollama" (only supported provider)
+        log_config: Whether to log configuration (default: True)
     
     Returns:
         LLMProvider instance
     """
     provider_type = provider_type.lower()
-    logger.info(f"Creating LLM provider: {provider_type}")
+    if log_config:
+        logger.info(f"Creating LLM provider: {provider_type}")
     
     if provider_type == "ollama":
         base_url = getattr(config.settings, 'ollama_base_url', 'http://localhost:11434')
         model = getattr(config.settings, 'ollama_model', 'llama3.2')
         guardrail_model = getattr(config.settings, 'ollama_guardrail_model', 'llama3.2')
-        logger.info(f"Ollama config - Base URL: {base_url}, Model: {model}, Guardrail Model: {guardrail_model}")
+        if log_config:
+            logger.info(f"Ollama config - Base URL: {base_url}, Model: {model}, Guardrail Model: {guardrail_model}")
         return OllamaProvider(base_url=base_url, model=model, guardrail_model=guardrail_model)
     else:
         raise ValueError(f"Unknown provider type: {provider_type}. Only 'ollama' is supported.")

@@ -2,7 +2,7 @@
 import logging
 import re
 from typing import Optional, Tuple
-from mcp.base import MCPHost
+from clients.mcp_client import MCPHost
 from services.guardrail import GuardrailService
 from services.llm_provider import create_llm_provider
 from services.prompts import PromptManager
@@ -237,24 +237,18 @@ class ChatService:
         conv_id = memory_result["conversation_id"]
         logger.info(f"[STEP 3.1] Conversation ID: {conv_id}")
         
-        # Step 4: MCP - Get conversation context from Memory Server (Resource)
-        logger.info(f"[STEP 4] Getting conversation context for: {conv_id}")
-        context_result = await self.memory_client.call_method(
-            "memory/get_context",
-            {"conversation_id": conv_id, "max_messages": 20}
+        # Step 4: MCP - Get existing summary (if any)
+        # Strategy: Use a single summary variable that accumulates all previous responses
+        logger.info(f"[STEP 4] Getting existing conversation summary for: {conv_id}")
+        summary_result = await self.memory_client.call_method(
+            "memory/get_summary",
+            {"conversation_id": conv_id}
         )
-        memory_context = context_result.get("messages", [])
-        logger.info(f"[STEP 4.1] Retrieved {len(memory_context)} messages from memory")
-        
-        # Step 5: Build context from memory + new user message
-        # Note: Frontend only sends the new user message, not full history
-        # Backend retrieves full context from memory (single source of truth)
-        logger.debug(f"[STEP 5] Building context - Memory: {len(memory_context)} messages, New user message: {user_message[:50]}...")
-        all_messages = memory_context.copy()
-        
-        # Add new user message to context
-        all_messages.append({"role": "user", "content": user_message})
-        logger.debug(f"[STEP 5.1] Context built. Total messages: {len(all_messages)}")
+        existing_summary = summary_result.get("summary", "")
+        if existing_summary:
+            logger.info(f"[STEP 4.1] Found existing summary: {existing_summary[:100]}...")
+        else:
+            logger.info(f"[STEP 4.1] No existing summary (first question in conversation)")
         
         # Step 6: MCP - Call search tool via Tool Server
         tool_name = "duckduckgo_search"
@@ -277,20 +271,26 @@ class ChatService:
             # No fallback - just raise error
             raise Exception(f"Search tool error: {str(e)}")
         
-        # Step 7: Build prompt with conversation context
-        logger.debug(f"[STEP 7] Building prompt with {len(all_messages)} messages in context")
+        # Step 7: Build prompt with conversation summary
+        # Strategy: Use a single summary variable that accumulates all previous responses
+        # This summary is updated after each response
+        logger.info(f"[STEP 7] Building prompt with conversation summary")
         # user_lang already detected in Step 1.5, reuse it
         logger.info(f"[STEP 7.1] Using detected user language: {user_lang}")
         
+        # Step 7.2: Build conversation summary text for prompt
+        # Use existing summary (if any) - this contains all previous responses summarized
         conversation_summary = ""
-        if len(all_messages) > 1:
-            prev_messages = [msg for msg in all_messages[:-1] if msg.get("role") in ["user", "assistant"]]
-            if prev_messages:
-                conversation_summary = "\n\nPrevious conversation context:\n"
-                for msg in prev_messages[-5:]:
-                    role = "Patient" if msg.get("role") == "user" else "Dentist"
-                    conversation_summary += f"{role}: {msg.get('content', '')}\n"
-                logger.debug(f"[STEP 7.2] Added {len(prev_messages[-5:])} previous messages to context")
+        
+        if existing_summary:
+            # Has summary: use it as context
+            summary_label = "Tóm tắt cuộc trò chuyện trước:" if user_lang == "vi" else "Previous conversation summary:"
+            conversation_summary = f"\n\n{summary_label}\n{existing_summary}\n"
+            logger.info(f"[STEP 7.2] Using existing summary as context. Summary length: {len(existing_summary)} characters")
+            logger.info(f"[STEP 7.2.1] Summary content: {existing_summary[:200]}...")
+        else:
+            # No summary: first question in conversation
+            logger.info(f"[STEP 7.2] No summary (first question in conversation)")
         
         # Extract sources from search results
         sources = _extract_sources(search_results)
@@ -305,20 +305,21 @@ class ChatService:
         )
         
         logger.info(f"[STEP 7.4] Prompt built. Length: {len(prompt)} characters")
-        logger.info(f"[STEP 7.5] --- PROMPT START ---\n{prompt}\n[STEP 7.5] --- PROMPT END ---")
+        logger.info(f"[STEP 7.4.1] Conversation summary in prompt: {conversation_summary[:200] if conversation_summary else 'EMPTY'}...")
+        # Note: Prompt is already logged by llm_provider.generate() - no need to log here
         
         # Step 8: Generate response with LLM
         logger.info(f"[STEP 8] Generating response with LLM provider: {config.settings.llm_provider}")
         try:
             # Use async LLM provider
+            # Note: Prompt and raw response are already logged by llm_provider.generate()
             response_text = await self.llm.generate(prompt)
             logger.info(f"[STEP 8.1] LLM response generated. Length: {len(response_text)} characters")
-            logger.info(f"[STEP 8.2] --- RAW RESPONSE START ---\n{response_text}\n[STEP 8.2] --- RAW RESPONSE END ---")
             
             # Format response: ensure proper line breaks and add sources
             response_text = _format_response(response_text, sources, user_lang)
-            logger.info(f"[STEP 8.3] Response formatted. Final length: {len(response_text)} characters")
-            logger.info(f"[STEP 8.4] --- FORMATTED RESPONSE START ---\n{response_text}\n[STEP 8.4] --- FORMATTED RESPONSE END ---")
+            logger.info(f"[STEP 8.2] Response formatted. Final length: {len(response_text)} characters")
+            logger.info(f"[STEP 8.3] --- FORMATTED RESPONSE START ---\n{response_text}\n[STEP 8.3] --- FORMATTED RESPONSE END ---")
         except Exception as e:
             logger.error(f"[STEP 8.3] Error generating response from LLM: {e}", exc_info=True)
             raise Exception(f"Error generating response: {str(e)}")
@@ -334,6 +335,41 @@ class ChatService:
             "memory/add_message",
             {"conversation_id": conv_id, "role": "assistant", "content": response_text}
         )
-        logger.info(f"[STEP 9.2] Saved assistant message. Chat processing completed successfully")
+        logger.debug(f"[STEP 9.2] Saved assistant message")
         
+        # Step 9.3: Summarize the new response and update summary
+        # Strategy: Summarize this Q&A pair and append to existing summary
+        logger.info(f"[STEP 9.3] Summarizing new response and updating conversation summary")
+        try:
+            # Summarize the new response (question + answer)
+            summarize_prompt = PromptManager.get_summarize_response_prompt(
+                question=user_message,
+                response=response_text,
+                language=user_lang
+            )
+            new_response_summary = await self.llm.generate(summarize_prompt)
+            new_response_summary = new_response_summary.strip()
+            
+            # Update summary: append new response summary to existing summary
+            if existing_summary:
+                # Combine: existing summary + new response summary
+                if user_lang == "vi":
+                    updated_summary = f"{existing_summary}\n\n{new_response_summary}"
+                else:
+                    updated_summary = f"{existing_summary}\n\n{new_response_summary}"
+            else:
+                # First summary
+                updated_summary = new_response_summary
+            
+            # Save updated summary
+            await self.memory_client.call_method(
+                "memory/set_summary",
+                {"conversation_id": conv_id, "summary": updated_summary, "compress": False}
+            )
+            logger.info(f"[STEP 9.4] Summary updated. New summary length: {len(updated_summary)} characters")
+        except Exception as e:
+            logger.error(f"[STEP 9.4] Error updating summary: {e}", exc_info=True)
+            # Continue without updating summary (non-critical)
+        
+        logger.info(f"[STEP 9.5] Chat processing completed successfully")
         return response_text, conv_id

@@ -1,0 +1,602 @@
+{
+	"info": {
+		"_postman_id": "mcp-server-collection",
+		"name": "MCP Server - Memory & Tool Services",
+		"description": "Complete collection for MCP Server with Memory and Tool services. Includes memory compression features.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health & Info",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check if MCP server is running and healthy"
+					}
+				},
+				{
+					"name": "List All Servers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers",
+							"host": ["{{base_url}}"],
+							"path": ["servers"]
+						},
+						"description": "List all available MCP servers with their capabilities"
+					}
+				},
+				{
+					"name": "Get Memory Server Capabilities",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/memory-server/capabilities",
+							"host": ["{{base_url}}"],
+							"path": ["servers", "memory-server", "capabilities"]
+						}
+					}
+				},
+				{
+					"name": "Get Tool Server Capabilities",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/tool-server/capabilities",
+							"host": ["{{base_url}}"],
+							"path": ["servers", "tool-server", "capabilities"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Memory Server - Conversation Management",
+			"item": [
+				{
+					"name": "Get or Create Conversation (New)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_or_create\",\n    \"params\": {},\n    \"id\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Create a new conversation. Returns a new conversation_id"
+					}
+				},
+				{
+					"name": "Get or Create Conversation (Existing)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_or_create\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				},
+				{
+					"name": "Get Conversation Context",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 3\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Get recent messages (only 6 most recent for LLM context, old ones are summarized)"
+					}
+				},
+				{
+					"name": "Get All Messages (Full History)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_all_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 3\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Get ALL messages (full history for display). Full history is always preserved, even after compression."
+					}
+				},
+				{
+					"name": "Get Old Messages",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_old_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 4\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Get old messages that should be summarized (excludes 6 recent messages)"
+					}
+				},
+				{
+					"name": "Get Conversation Summary",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Get conversation summary text (if exists, after compression)"
+					}
+				},
+				{
+					"name": "Get or Create Summary",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_or_create_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"old_messages\": [],\n        \"language\": \"vi\"\n    },\n    \"id\": 6\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Get existing summary or return empty if needs to be created"
+					}
+				},
+				{
+					"name": "Set Summary (with Compression)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/set_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"summary\": \"Tóm tắt cuộc trò chuyện về sâu răng và cách phòng ngừa\",\n        \"compress\": true\n    },\n    \"id\": 7\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Set summary and compress (delete old messages). compress=true will delete old messages after summarizing."
+					}
+				},
+				{
+					"name": "Clear Conversation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/clear\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 8\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				},
+				{
+					"name": "Delete Conversation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/delete\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 9\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Memory Server - Messages",
+			"item": [
+				{
+					"name": "Add User Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/add_message\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"role\": \"user\",\n        \"content\": \"Tôi muốn biết về sâu răng\"\n    },\n    \"id\": 10\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				},
+				{
+					"name": "Add Assistant Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/add_message\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"role\": \"assistant\",\n        \"content\": \"Sâu răng là tình trạng phá hủy men răng do vi khuẩn...\"\n    },\n    \"id\": 11\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Memory Server - Resources",
+			"item": [
+				{
+					"name": "List All Conversations",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/resources/list\",\n    \"params\": {},\n    \"id\": 12\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				},
+				{
+					"name": "Read Conversation Resource",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/resources/read\",\n    \"params\": {\n        \"uri\": \"memory://conversation/{{conversation_id}}\"\n    },\n    \"id\": 13\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Tool Server",
+			"item": [
+				{
+					"name": "List Tools",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tool-server/tools/list\",\n    \"params\": {},\n    \"id\": 14\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "List all available tools (code-driven selection)"
+					}
+				},
+				{
+					"name": "Call DuckDuckGo Search",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"tool-server/tools/call\",\n    \"params\": {\n        \"name\": \"duckduckgo_search\",\n        \"arguments\": {\n            \"query\": \"sâu răng nguyên nhân và cách điều trị\"\n        }\n    },\n    \"id\": 15\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Execute DuckDuckGo search tool (code-driven, not LLM-driven)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Memory Compression Demo",
+			"item": [
+				{
+					"name": "1. Create Conversation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_or_create\",\n    \"params\": {},\n    \"id\": 100\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 1: Create conversation. Copy conversation_id from response."
+					}
+				},
+				{
+					"name": "2. Add Multiple Messages (8 messages)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/add_message\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"role\": \"user\",\n        \"content\": \"Message 1\"\n    },\n    \"id\": 101\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 2: Add 8 messages (4 user + 4 assistant) to trigger compression. Repeat this request 8 times with different content."
+					}
+				},
+				{
+					"name": "3. Get Context (Should return only 6 recent)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 102\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 3: Get context. Should return only 6 most recent messages (if > 6 total)"
+					}
+				},
+				{
+					"name": "4. Get Old Messages",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_old_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 103\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 4: Get old messages (should return messages before the 6 recent ones)"
+					}
+				},
+				{
+					"name": "5. Set Summary and Compress",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/set_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"summary\": \"Tóm tắt: Bệnh nhân hỏi về sâu răng, cách phòng ngừa và điều trị\",\n        \"compress\": true\n    },\n    \"id\": 104\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 5: Set summary and compress. This will delete old messages, keeping only summary + 6 recent messages."
+					}
+				},
+				{
+					"name": "6. Verify Compression (Get Context)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 105\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 6: Verify compression. Should return only 6 recent messages (old ones deleted)"
+					}
+				},
+				{
+					"name": "7. Get Summary",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 106\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jsonrpc",
+							"host": ["{{base_url}}"],
+							"path": ["jsonrpc"]
+						},
+						"description": "Step 7: Get summary. Should return the summary text that was created."
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8001",
+			"type": "string"
+		},
+		{
+			"key": "conversation_id",
+			"value": "",
+			"type": "string",
+			"description": "Set this after creating a conversation"
+		}
+	]
+}
