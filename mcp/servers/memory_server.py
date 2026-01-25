@@ -26,6 +26,7 @@ class MemoryMCPServer(MCPServer):
         self.register_method("memory/get_context", self._get_context)
         self.register_method("memory/add_message", self._add_message)
         self.register_method("memory/get_or_create", self._get_or_create)
+        self.register_method("memory/get_summary", self._get_summary)
         self.register_method("memory/clear", self._clear)
         self.register_method("memory/delete", self._delete)
     
@@ -93,6 +94,11 @@ class MemoryMCPServer(MCPServer):
         """Get or create conversation."""
         conv_id = self.memory_service.get_or_create_conversation(conversation_id)
         return {"conversation_id": conv_id}
+    
+    async def _get_summary(self, conversation_id: str) -> Dict[str, Any]:
+        """Get conversation summary."""
+        summary = self.memory_service.get_conversation_summary(conversation_id)
+        return {"summary": summary}
     
     async def _clear(self, conversation_id: str) -> Dict[str, Any]:
         """Clear conversation."""

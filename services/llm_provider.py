@@ -36,7 +36,7 @@ class OllamaProvider(LLMProvider):
         """Generate using Ollama."""
         model_to_use = self.guardrail_model if use_guardrail_model else self.model
         logger.info(f"[OLLAMA] Generating with model: {model_to_use}, prompt length: {len(prompt)}")
-        logger.info(f"[OLLAMA] Full prompt content:\n{prompt}")
+        logger.info(f"[OLLAMA] --- PROMPT START ---\n{prompt}\n[OLLAMA] --- PROMPT END ---")
         
         try:
             import httpx
@@ -60,7 +60,7 @@ class OllamaProvider(LLMProvider):
                 data = response.json()
                 result = data.get("response", "")
                 logger.info(f"[OLLAMA] Generation completed. Response length: {len(result)} characters")
-                logger.info(f"[OLLAMA] Full response content:\n{result}")
+                logger.info(f"[OLLAMA] --- RESPONSE START ---\n{result}\n[OLLAMA] --- RESPONSE END ---")
                 return result
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:

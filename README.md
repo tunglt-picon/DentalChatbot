@@ -68,8 +68,11 @@ Edit `.env` file:
 # Ollama Settings (Default - Recommended)
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
-OLLAMA_GUARDRAIL_MODEL=llama3.2
+OLLAMA_MODEL=qwen2.5:7b-instruct
+OLLAMA_GUARDRAIL_MODEL=phi3:latest
+
+# MCP Server Settings
+MCP_SERVER_URL=http://localhost:8001
 
 ```
 
@@ -81,7 +84,30 @@ ollama serve
 
 ## Running the Application
 
-### Development mode
+### 1. Start MCP Server (Required - runs on port 8001)
+
+MCP Server là một service độc lập cung cấp Memory và Tool services:
+
+```bash
+# Option 1: Using Python module
+python -m mcp.server
+
+# Option 2: Using run script
+python run_mcp_server.py
+
+# Option 3: Using uvicorn directly
+uvicorn mcp.server:app --host 0.0.0.0 --port 8001
+```
+
+MCP Server sẽ chạy tại: `http://localhost:8001`
+
+**Endpoints**:
+- `POST /jsonrpc`: JSON-RPC endpoint cho MCP protocol
+- `GET /health`: Health check
+- `GET /servers`: Liệt kê available servers
+- `GET /servers/{server_name}/capabilities`: Lấy capabilities của server
+
+### 2. Start Main Application (runs on port 8000)
 
 ```bash
 python main.py
@@ -93,7 +119,9 @@ or use uvicorn directly:
 uvicorn main:app --reload
 ```
 
-Server will run at: `http://localhost:8000`
+Main application sẽ chạy tại: `http://localhost:8000`
+
+**Lưu ý**: Main application cần MCP Server đang chạy để hoạt động.
 
 ### Access Web Interface
 

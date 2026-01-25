@@ -85,8 +85,8 @@ class GuardrailService:
             
             logger.debug(f"[GUARDRAIL] Raw response: {response}")
             logger.debug(f"[GUARDRAIL] Full response length: {len(response)} characters")
-            logger.info(f"[GUARDRAIL] Full prompt sent to LLM:\n{prompt}")
-            logger.info(f"[GUARDRAIL] Full response from LLM:\n{response}")
+            logger.info(f"[GUARDRAIL] --- PROMPT START ---\n{prompt}\n[GUARDRAIL] --- PROMPT END ---")
+            logger.info(f"[GUARDRAIL] --- RESPONSE START ---\n{response}\n[GUARDRAIL] --- RESPONSE END ---")
             
             # Extract first word/line from response and normalize
             first_line = response.strip().split('\n')[0].strip().upper()

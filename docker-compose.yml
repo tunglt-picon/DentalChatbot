@@ -28,6 +28,28 @@ services:
         wait
       "
 
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-server
+    command: python run_mcp_server.py
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - dental-chatbot-network
+
   dental-chatbot-backend:
     build:
       context: .
@@ -44,12 +66,16 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
       - OLLAMA_GUARDRAIL_MODEL=${OLLAMA_GUARDRAIL_MODEL:-phi-3}
+      
+      # MCP Server Settings
+      - MCP_SERVER_URL=${MCP_SERVER_URL:-http://mcp-server:8001}
     env_file:
       - .env
     volumes:
        - .:/app
     depends_on:
       - ollama
+      - mcp-server
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

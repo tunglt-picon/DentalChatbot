@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # Alternative: llama3.2:latest (2.0GB, also good)
     # Default: phi3:latest (lightweight, fast for guardrail checks)
     ollama_guardrail_model: str = "phi3:latest"
+    
+    # ============================================
+    # MCP Server Configuration
+    # ============================================
+    # MCP HTTP Server URL (default: localhost:8001)
+    mcp_server_url: str = "http://localhost:8001"
 
 
 settings = Settings()

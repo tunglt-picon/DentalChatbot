@@ -3,20 +3,16 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 import logging
+import config as app_config
 from services.chat_service import ChatService
 from mcp.base import MCPHost
-from mcp.servers import MemoryMCPServer, ToolMCPServer
 
 logger = logging.getLogger(__name__)
 
-# Initialize MCP Host and servers
-logger.info("Initializing MCP Host and servers...")
-mcp_host = MCPHost()
-memory_server = MemoryMCPServer()
-tool_server = ToolMCPServer()
-mcp_host.register_server(memory_server)
-mcp_host.register_server(tool_server)
-logger.info("MCP servers registered successfully")
+# Initialize MCP Host (connects to standalone MCP HTTP server)
+logger.info(f"Initializing MCP Host - connecting to MCP server at {app_config.settings.mcp_server_url}")
+mcp_host = MCPHost(base_url=app_config.settings.mcp_server_url)
+logger.info("MCP Host initialized successfully")
 
 # Initialize ChatService with MCP
 chat_service = ChatService(mcp_host=mcp_host)
@@ -264,17 +260,23 @@ async def get_conversation(conversation_id: str):
     """
     try:
         memory_client = mcp_host.get_client("memory-server")
-        if not memory_client:
-            raise HTTPException(status_code=500, detail="Memory server not available")
         
-        # Get context via MCP
+        # Get context via MCP HTTP server
         context_result = await memory_client.call_method(
             "memory/get_context",
             {"conversation_id": conversation_id}
         )
         
-        # Get summary directly from memory_server instance
-        summary = memory_server.memory_service.get_conversation_summary(conversation_id)
+        # Get summary via MCP HTTP server
+        try:
+            summary_result = await memory_client.call_method(
+                "memory/get_summary",
+                {"conversation_id": conversation_id}
+            )
+            summary = summary_result.get("summary", "")
+        except Exception as e:
+            logger.warning(f"Could not get summary: {e}")
+            summary = ""
         
         return {
             "conversation_id": conversation_id,
@@ -295,8 +297,6 @@ async def delete_conversation(conversation_id: str):
     """
     try:
         memory_client = mcp_host.get_client("memory-server")
-        if not memory_client:
-            raise HTTPException(status_code=500, detail="Memory server not available")
         
         result = await memory_client.call_method(
             "memory/delete",
@@ -317,8 +317,6 @@ async def clear_conversation(conversation_id: str):
     """
     try:
         memory_client = mcp_host.get_client("memory-server")
-        if not memory_client:
-            raise HTTPException(status_code=500, detail="Memory server not available")
         
         result = await memory_client.call_method(
             "memory/clear",

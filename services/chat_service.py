@@ -3,7 +3,6 @@ import logging
 import re
 from typing import Optional, Tuple
 from mcp.base import MCPHost
-from mcp.servers import MemoryMCPServer, ToolMCPServer
 from services.guardrail import GuardrailService
 from services.llm_provider import create_llm_provider
 from services.prompts import PromptManager
@@ -45,7 +44,10 @@ def _extract_sources(search_results: str) -> list:
             link = re.sub(r'[^\w\-_./?#=&:]+$', '', link)
             
             title = title_match.group(1).strip() if title_match else "Nguồn"
-            # Clean title
+            # Clean title: remove markdown link format if present
+            # Remove [[text]](url) or [text](url) format, keep only text
+            title = re.sub(r'\[\[([^\]]+)\]\]\([^\)]+\)', r'\1', title)  # Remove [[text]](url)
+            title = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', title)  # Remove [text](url)
             title = title.strip('"\'')
             
             # Avoid duplicates
@@ -125,11 +127,15 @@ def _format_response(response_text: str, sources: list, user_lang: str) -> str:
         if user_lang == "vi":
             sources_section = "\n\n---\n\n**Nguồn tham khảo:**\n\n"
             for idx, source in enumerate(sources, 1):
-                sources_section += f"{idx}. [{source['title']}]({source['link']})\n"
+                # Escape brackets in title to avoid markdown link format issues
+                title = source['title'].replace('[', '\\[').replace(']', '\\]')
+                sources_section += f"{idx}. [{title}]({source['link']})\n"
         else:
             sources_section = "\n\n---\n\n**Sources:**\n\n"
             for idx, source in enumerate(sources, 1):
-                sources_section += f"{idx}. [{source['title']}]({source['link']})\n"
+                # Escape brackets in title to avoid markdown link format issues
+                title = source['title'].replace('[', '\\[').replace(']', '\\]')
+                sources_section += f"{idx}. [{title}]({source['link']})\n"
         
         # Ensure sources section ends with double newline for proper paragraph separation
         sources_section = sources_section.rstrip() + "\n"
@@ -146,24 +152,22 @@ class ChatService:
         Initialize ChatService with MCP.
         
         Args:
-            mcp_host: MCP Host instance (creates new with servers if None)
+            mcp_host: MCP Host instance (creates new if None)
         """
         # Use configured LLM provider (Ollama)
         self.llm = create_llm_provider(config.settings.llm_provider)
         self.guardrail = GuardrailService()
         
-        # Setup MCP Host and servers
+        # Setup MCP Host (connects to standalone MCP HTTP server)
         if mcp_host is None:
-            self.mcp_host = MCPHost()
-            # Register MCP servers
-            memory_server = MemoryMCPServer()
-            tool_server = ToolMCPServer()
-            self.memory_client = self.mcp_host.register_server(memory_server)
-            self.tool_client = self.mcp_host.register_server(tool_server)
+            import config as app_config
+            self.mcp_host = MCPHost(base_url=app_config.settings.mcp_server_url)
         else:
             self.mcp_host = mcp_host
-            self.memory_client = mcp_host.get_client("memory-server")
-            self.tool_client = mcp_host.get_client("tool-server")
+        
+        # Get MCP clients (will connect to HTTP server)
+        self.memory_client = self.mcp_host.get_client("memory-server")
+        self.tool_client = self.mcp_host.get_client("tool-server")
     
     async def process_chat(
         self,
@@ -213,24 +217,15 @@ class ChatService:
             
             friendly_message = PromptManager.get_rejection_message(user_lang)
             
-            # Still save to memory for conversation continuity
+            # Do NOT save to memory when question is not dental-related
+            # Only get conversation_id for response consistency (but don't save messages)
             memory_result = await self.memory_client.call_method(
                 "memory/get_or_create",
                 {"conversation_id": conversation_id}
             )
             conv_id = memory_result["conversation_id"]
             
-            # Save user message and assistant response
-            await self.memory_client.call_method(
-                "memory/add_message",
-                {"conversation_id": conv_id, "role": "user", "content": user_message}
-            )
-            await self.memory_client.call_method(
-                "memory/add_message",
-                {"conversation_id": conv_id, "role": "assistant", "content": friendly_message}
-            )
-            
-            logger.info(f"[STEP 2.3] Returned friendly rejection message. Conversation ID: {conv_id}")
+            logger.info(f"[STEP 2.3] Question rejected - NOT saved to memory. Returned friendly rejection message. Conversation ID: {conv_id}")
             return friendly_message, conv_id
         
         # Step 3: MCP - Get or create conversation via Memory Server (only if passed guardrail)
@@ -310,7 +305,7 @@ class ChatService:
         )
         
         logger.info(f"[STEP 7.4] Prompt built. Length: {len(prompt)} characters")
-        logger.info(f"[STEP 7.5] Full prompt content:\n{prompt}")
+        logger.info(f"[STEP 7.5] --- PROMPT START ---\n{prompt}\n[STEP 7.5] --- PROMPT END ---")
         
         # Step 8: Generate response with LLM
         logger.info(f"[STEP 8] Generating response with LLM provider: {config.settings.llm_provider}")
@@ -318,12 +313,12 @@ class ChatService:
             # Use async LLM provider
             response_text = await self.llm.generate(prompt)
             logger.info(f"[STEP 8.1] LLM response generated. Length: {len(response_text)} characters")
-            logger.info(f"[STEP 8.2] Raw LLM response (full):\n{response_text}")
+            logger.info(f"[STEP 8.2] --- RAW RESPONSE START ---\n{response_text}\n[STEP 8.2] --- RAW RESPONSE END ---")
             
             # Format response: ensure proper line breaks and add sources
             response_text = _format_response(response_text, sources, user_lang)
             logger.info(f"[STEP 8.3] Response formatted. Final length: {len(response_text)} characters")
-            logger.info(f"[STEP 8.4] Formatted response with sources (full):\n{response_text}")
+            logger.info(f"[STEP 8.4] --- FORMATTED RESPONSE START ---\n{response_text}\n[STEP 8.4] --- FORMATTED RESPONSE END ---")
         except Exception as e:
             logger.error(f"[STEP 8.3] Error generating response from LLM: {e}", exc_info=True)
             raise Exception(f"Error generating response: {str(e)}")

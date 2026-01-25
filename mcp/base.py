@@ -111,17 +111,18 @@ class MCPServer(ABC):
 
 
 class MCPClient:
-    """MCP client for communicating with MCP servers."""
+    """MCP client for communicating with MCP servers via HTTP."""
     
-    def __init__(self, server: MCPServer):
+    def __init__(self, server_name: str, base_url: str = "http://localhost:8001"):
         """
         Initialize MCP client.
         
         Args:
-            server: MCP server instance to communicate with
+            server_name: Name of the server (e.g., "memory-server", "tool-server")
+            base_url: Base URL of the MCP HTTP server
         """
-        self.server = server
-        self.server_name = server.server_name
+        self.server_name = server_name
+        self.base_url = base_url.rstrip("/")
     
     async def call_method(
         self,
@@ -130,10 +131,10 @@ class MCPClient:
         request_id: Optional[Union[str, int]] = None
     ) -> Any:
         """
-        Call a method on the server.
+        Call a method on the server via HTTP.
         
         Args:
-            method: Method name
+            method: Method name (e.g., "memory/get_context")
             params: Method parameters
             request_id: Optional request ID
             
@@ -143,56 +144,124 @@ class MCPClient:
         Raises:
             JSONRPCError: If the method call fails
         """
-        request = JSONRPCRequest(method=method, params=params or {}, request_id=request_id)
-        response = await self.server.handle_request(request)
+        import httpx
         
-        if response.error:
-            raise response.error
+        # Full method path: {server_name}/{method}
+        full_method = f"{self.server_name}/{method}"
         
-        return response.result
+        # Create JSON-RPC request
+        request_data = {
+            "jsonrpc": "2.0",
+            "method": full_method,
+            "params": params or {},
+        }
+        if request_id is not None:
+            request_data["id"] = request_id
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/jsonrpc",
+                    json=request_data
+                )
+                response.raise_for_status()
+                result = response.json()
+                
+                # Check for JSON-RPC error
+                if "error" in result:
+                    error_data = result["error"]
+                    raise JSONRPCError(
+                        error_data.get("code", JSONRPCErrorCode.INTERNAL_ERROR.value),
+                        error_data.get("message", "Unknown error"),
+                        error_data.get("data")
+                    )
+                
+                return result.get("result")
+                
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error calling MCP server: {e}")
+            raise JSONRPCError(
+                JSONRPCErrorCode.INTERNAL_ERROR.value,
+                f"Failed to connect to MCP server at {self.base_url}: {str(e)}"
+            )
+        except JSONRPCError:
+            raise
+        except Exception as e:
+            logger.error(f"Error calling MCP method {full_method}: {e}", exc_info=True)
+            raise JSONRPCError(
+                JSONRPCErrorCode.INTERNAL_ERROR.value,
+                f"Error calling MCP method: {str(e)}"
+            )
     
     async def list_tools(self) -> list:
         """List available tools on the server."""
-        capabilities = self.server.get_capabilities()
-        return capabilities.get("tools", [])
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.base_url}/servers/{self.server_name}/capabilities")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("capabilities", {}).get("tools", [])
+        except Exception as e:
+            logger.error(f"Error listing tools: {e}")
+            return []
     
     async def list_resources(self) -> list:
         """List available resources on the server."""
-        capabilities = self.server.get_capabilities()
-        return capabilities.get("resources", [])
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.base_url}/servers/{self.server_name}/capabilities")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("capabilities", {}).get("resources", [])
+        except Exception as e:
+            logger.error(f"Error listing resources: {e}")
+            return []
     
     async def list_prompts(self) -> list:
         """List available prompts on the server."""
-        capabilities = self.server.get_capabilities()
-        return capabilities.get("prompts", [])
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.base_url}/servers/{self.server_name}/capabilities")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("capabilities", {}).get("prompts", [])
+        except Exception as e:
+            logger.error(f"Error listing prompts: {e}")
+            return []
 
 
 class MCPHost:
     """MCP Host orchestrates clients and manages context."""
     
-    def __init__(self):
-        """Initialize MCP Host."""
+    def __init__(self, base_url: str = "http://localhost:8001"):
+        """
+        Initialize MCP Host.
+        
+        Args:
+            base_url: Base URL of the MCP HTTP server
+        """
+        self.base_url = base_url
         self.clients: Dict[str, MCPClient] = {}
         self.conversation_history: Dict[str, list] = {}
     
-    def register_server(self, server: MCPServer) -> MCPClient:
+    def get_client(self, server_name: str) -> MCPClient:
         """
-        Register an MCP server and create a client.
+        Get or create client for a server.
         
         Args:
-            server: MCP server to register
+            server_name: Name of the server (e.g., "memory-server", "tool-server")
             
         Returns:
             MCP client for the server
         """
-        client = MCPClient(server)
-        self.clients[server.server_name] = client
-        logger.info(f"Registered MCP server: {server.server_name}")
-        return client
-    
-    def get_client(self, server_name: str) -> Optional[MCPClient]:
-        """Get client for a server."""
-        return self.clients.get(server_name)
+        if server_name not in self.clients:
+            client = MCPClient(server_name, base_url=self.base_url)
+            self.clients[server_name] = client
+            logger.info(f"Created MCP client for server: {server_name} at {self.base_url}")
+        return self.clients[server_name]
     
     def store_conversation_context(self, conversation_id: str, messages: list) -> None:
         """Store conversation context in host (not in servers)."""
