@@ -42,8 +42,8 @@ class DuckDuckGoSearchTool:
                     )
             
             with DDGS() as ddgs:
-                logger.debug(f"[DUCKDUCKGO] DDGS instance created, searching with max_results=5...")
-                results = list(ddgs.text(query, max_results=5))
+                logger.debug(f"[DUCKDUCKGO] DDGS instance created, searching with max_results=3...")
+                results = list(ddgs.text(query, max_results=3))  # Reduced from 5 to 3 for faster processing
                 logger.info(f"[DUCKDUCKGO] Found {len(results)} results")
                 logger.debug(f"[DUCKDUCKGO] Raw results: {results}")
             
@@ -51,7 +51,7 @@ class DuckDuckGoSearchTool:
                 logger.warning(f"[DUCKDUCKGO] No results found for query: {query}")
                 return f"No results found for query: {query}"
             
-            # Format results
+            # Format results (keep full content, no truncation)
             formatted_results = []
             for idx, result in enumerate(results, 1):
                 title = result.get("title", "")

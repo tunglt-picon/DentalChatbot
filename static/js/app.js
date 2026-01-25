@@ -42,7 +42,7 @@ function getCurrentConfig() {
             llm_provider: 'ollama',
             guardrail_provider: 'ollama',
             ollama_model: config.ollama_model || 'qwen2.5:7b-instruct',
-            ollama_guardrail_model: config.ollama_guardrail_model || 'phi3:latest'
+            ollama_guardrail_model: config.ollama_guardrail_model || 'qwen2.5:3b-instruct'
         };
     }
     // Return default config if none saved
@@ -50,7 +50,7 @@ function getCurrentConfig() {
         llm_provider: 'ollama',
         guardrail_provider: 'ollama',
         ollama_model: 'qwen2.5:7b-instruct',
-        ollama_guardrail_model: 'phi3:latest'
+        ollama_guardrail_model: 'qwen2.5:3b-instruct'
     };
 }
 

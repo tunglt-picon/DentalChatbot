@@ -32,8 +32,15 @@ class OllamaProvider(LLMProvider):
         self.model = model
         self.guardrail_model = guardrail_model or model
     
-    async def generate(self, prompt: str, use_guardrail_model: bool = False) -> str:
-        """Generate using Ollama."""
+    async def generate(self, prompt: str, use_guardrail_model: bool = False, max_tokens: Optional[int] = None) -> str:
+        """
+        Generate using Ollama.
+        
+        Args:
+            prompt: Input prompt
+            use_guardrail_model: Use guardrail model (smaller, faster)
+            max_tokens: Maximum tokens to generate (None = no limit, for summarization use smaller value)
+        """
         model_to_use = self.guardrail_model if use_guardrail_model else self.model
         logger.info(f"[OLLAMA] Generating with model: {model_to_use}, prompt length: {len(prompt)}")
         logger.info(f"[OLLAMA] --- PROMPT START ---\n{prompt}\n[OLLAMA] --- PROMPT END ---")
@@ -41,7 +48,11 @@ class OllamaProvider(LLMProvider):
         try:
             import httpx
             # Increase timeout for larger models (qwen2.5:7b-instruct can take longer)
-            timeout_duration = 180.0 if "7b" in model_to_use or "8b" in model_to_use else 120.0
+            # For guardrail/summarization (smaller models), use shorter timeout
+            if use_guardrail_model or max_tokens:
+                timeout_duration = 60.0  # Faster timeout for small tasks
+            else:
+                timeout_duration = 180.0 if "7b" in model_to_use or "8b" in model_to_use else 120.0
             async with httpx.AsyncClient(timeout=timeout_duration) as client:
                 logger.debug(f"[OLLAMA] Sending request to {self.base_url}/api/generate")
                 request_payload = {
@@ -49,6 +60,9 @@ class OllamaProvider(LLMProvider):
                     "prompt": prompt,
                     "stream": False
                 }
+                # Add num_predict to limit tokens for faster generation (especially for summarization)
+                if max_tokens:
+                    request_payload["options"] = {"num_predict": max_tokens}
                 logger.debug(f"[OLLAMA] Request payload (model, stream only): model={model_to_use}, stream=False")
                 
                 response = await client.post(

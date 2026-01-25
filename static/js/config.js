@@ -24,14 +24,20 @@ function loadConfig() {
     const saved = localStorage.getItem('dentalChatbot_config');
     if (saved) {
         try {
-            const config = JSON.parse(saved);
+        const config = JSON.parse(saved);
             
             // Clean up old config: remove gemini/google/search_tool fields
+            // Migrate phi3:latest to qwen2.5:3b-instruct (new default)
+            let guardrailModel = config.ollama_guardrail_model || 'qwen2.5:3b-instruct';
+            if (guardrailModel === 'phi3:latest' || guardrailModel === 'phi-3') {
+                guardrailModel = 'qwen2.5:3b-instruct';
+            }
+            
             const cleanConfig = {
                 llm_provider: 'ollama',
                 guardrail_provider: 'ollama',
                 ollama_model: config.ollama_model || 'qwen2.5:7b-instruct',
-                ollama_guardrail_model: config.ollama_guardrail_model || 'phi3:latest'
+                ollama_guardrail_model: guardrailModel
             };
             
             // Save cleaned config back to localStorage
@@ -44,12 +50,12 @@ function loadConfig() {
             console.error('Error loading config:', error);
             // Use defaults if parse fails
             chatModelEl.value = 'qwen2.5:7b-instruct';
-            guardrailModelEl.value = 'phi3:latest';
+            guardrailModelEl.value = 'qwen2.5:3b-instruct';
         }
     } else {
         // No saved config, use defaults
         chatModelEl.value = 'qwen2.5:7b-instruct';
-        guardrailModelEl.value = 'phi3:latest';
+        guardrailModelEl.value = 'qwen2.5:3b-instruct';
     }
 }
 

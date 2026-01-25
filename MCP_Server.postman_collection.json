@@ -108,28 +108,6 @@
 					}
 				},
 				{
-					"name": "Get Conversation Context",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 3\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/jsonrpc",
-							"host": ["{{base_url}}"],
-							"path": ["jsonrpc"]
-						},
-						"description": "Get recent messages (only 6 most recent for LLM context, old ones are summarized)"
-					}
-				},
-				{
 					"name": "Get All Messages (Full History)",
 					"request": {
 						"method": "POST",
@@ -152,28 +130,6 @@
 					}
 				},
 				{
-					"name": "Get Old Messages",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_old_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 4\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/jsonrpc",
-							"host": ["{{base_url}}"],
-							"path": ["jsonrpc"]
-						},
-						"description": "Get old messages that should be summarized (excludes 6 recent messages)"
-					}
-				},
-				{
 					"name": "Get Conversation Summary",
 					"request": {
 						"method": "POST",
@@ -192,33 +148,11 @@
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Get conversation summary text (if exists, after compression)"
+						"description": "Get conversation summary text (if exists). This is a single summary variable that accumulates all previous responses."
 					}
 				},
 				{
-					"name": "Get or Create Summary",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_or_create_summary\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\",\n        \"old_messages\": [],\n        \"language\": \"vi\"\n    },\n    \"id\": 6\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/jsonrpc",
-							"host": ["{{base_url}}"],
-							"path": ["jsonrpc"]
-						},
-						"description": "Get existing summary or return empty if needs to be created"
-					}
-				},
-				{
-					"name": "Set Summary (with Compression)",
+					"name": "Set Summary",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -236,7 +170,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Set summary and compress (delete old messages). compress=true will delete old messages after summarizing."
+						"description": "Set summary for conversation. This is a single summary variable that accumulates all previous responses. compress parameter is not used anymore."
 					}
 				},
 				{
@@ -427,7 +361,7 @@
 			]
 		},
 		{
-			"name": "Memory Compression Demo",
+					"name": "Summary Accumulation Demo",
 			"item": [
 				{
 					"name": "1. Create Conversation",
@@ -470,11 +404,11 @@
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Step 2: Add 8 messages (4 user + 4 assistant) to trigger compression. Repeat this request 8 times with different content."
+						"description": "Step 2: Add messages (user + assistant pairs). Repeat this request multiple times with different content."
 					}
 				},
 				{
-					"name": "3. Get Context (Should return only 6 recent)",
+					"name": "3. Get All Messages (Full History)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -485,40 +419,18 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 102\n}"
+							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_all_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 102\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/jsonrpc",
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Step 3: Get context. Should return only 6 most recent messages (if > 6 total)"
+						"description": "Step 3: Get all messages (full history for display)"
 					}
 				},
 				{
-					"name": "4. Get Old Messages",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_old_messages\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 103\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/jsonrpc",
-							"host": ["{{base_url}}"],
-							"path": ["jsonrpc"]
-						},
-						"description": "Step 4: Get old messages (should return messages before the 6 recent ones)"
-					}
-				},
-				{
-					"name": "5. Set Summary and Compress",
+					"name": "4. Set Summary",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -536,33 +448,11 @@
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Step 5: Set summary and compress. This will delete old messages, keeping only summary + 6 recent messages."
+						"description": "Step 4: Set summary. This is a single summary variable that accumulates all previous responses."
 					}
 				},
 				{
-					"name": "6. Verify Compression (Get Context)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"jsonrpc\": \"2.0\",\n    \"method\": \"memory-server/memory/get_context\",\n    \"params\": {\n        \"conversation_id\": \"{{conversation_id}}\"\n    },\n    \"id\": 105\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/jsonrpc",
-							"host": ["{{base_url}}"],
-							"path": ["jsonrpc"]
-						},
-						"description": "Step 6: Verify compression. Should return only 6 recent messages (old ones deleted)"
-					}
-				},
-				{
-					"name": "7. Get Summary",
+					"name": "5. Get Summary",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -580,7 +470,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["jsonrpc"]
 						},
-						"description": "Step 7: Get summary. Should return the summary text that was created."
+						"description": "Step 5: Get summary. Should return the accumulated summary of all previous responses."
 					}
 				}
 			]

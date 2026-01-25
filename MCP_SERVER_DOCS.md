@@ -154,38 +154,6 @@ Get existing conversation or create new one.
 }
 ```
 
-### `memory/get_context`
-Get conversation context (only recent messages for LLM context, old ones are summarized).
-
-**Request:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "memory-server/memory/get_context",
-  "params": {
-    "conversation_id": "chat_xxx",
-    "max_messages": 20  // Optional
-  },
-  "id": 2
-}
-```
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "messages": [
-      {"role": "user", "content": "..."},
-      {"role": "assistant", "content": "..."}
-    ]
-  },
-  "id": 2
-}
-```
-
-**Note**: Chỉ trả về 6 messages gần nhất (KEEP_RECENT_MESSAGES) để giảm context size cho LLM. Old messages đã được summarize. Full history vẫn được lưu và có thể lấy qua `memory/get_all_messages`.
-
 ### `memory/get_all_messages`
 Get ALL messages in conversation (full history for display).
 
@@ -216,68 +184,6 @@ Get ALL messages in conversation (full history for display).
 ```
 
 **Note**: Trả về TẤT CẢ messages (full history) để hiển thị. Full history luôn được lưu, không bị xóa khi compress.
-
-### `memory/get_old_messages`
-Get old messages that should be summarized (excludes recent messages).
-
-**Request:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "memory-server/memory/get_old_messages",
-  "params": {
-    "conversation_id": "chat_xxx"
-  },
-  "id": 3
-}
-```
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "messages": [
-      {"role": "user", "content": "..."},
-      {"role": "assistant", "content": "..."}
-    ],
-    "total_count": 10
-  },
-  "id": 3
-}
-```
-
-**Note**: Chỉ trả về old messages (trước 6 messages gần nhất). Nếu đã compress, sẽ trả về empty.
-
-### `memory/get_or_create_summary`
-Get existing summary or indicate that summary needs to be created.
-
-**Request:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "memory-server/memory/get_or_create_summary",
-  "params": {
-    "conversation_id": "chat_xxx",
-    "old_messages": [...],
-    "language": "vi"  // "vi" or "en"
-  },
-  "id": 4
-}
-```
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "summary": "Tóm tắt cuộc trò chuyện..."  // Empty if needs to be created
-  },
-  "id": 4
-}
-```
-
-**Note**: Nếu summary chưa tồn tại, trả về empty string. Chat service sẽ tạo summary và gọi `memory/set_summary`.
 
 ### `memory/set_summary`
 Set summary for conversation. This is a single summary variable that accumulates all previous responses.

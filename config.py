@@ -34,11 +34,11 @@ class Settings(BaseSettings):
     # Default: qwen2.5:7b-instruct (best quality for Vietnamese)
     ollama_model: str = "qwen2.5:7b-instruct"
     
-    # Ollama model for guardrail (lighter models for fast checks)
-    # Best: phi3:latest (2.2GB, fast and efficient)
-    # Alternative: llama3.2:latest (2.0GB, also good)
-    # Default: phi3:latest (lightweight, fast for guardrail checks)
-    ollama_guardrail_model: str = "phi3:latest"
+    # Ollama model for guardrail and summary (lighter models for fast checks)
+    # Best: qwen2.5:3b-instruct (1.9GB, fast and efficient, good Vietnamese support)
+    # Alternative: phi3:latest (2.2GB, also good), llama3.2:latest (2.0GB)
+    # Default: qwen2.5:3b-instruct (lightweight, fast for guardrail checks and summarization)
+    ollama_guardrail_model: str = "qwen2.5:3b-instruct"
     
     # ============================================
     # MCP Server Configuration

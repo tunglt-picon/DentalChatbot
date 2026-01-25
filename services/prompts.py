@@ -33,54 +33,40 @@ Trả lời CHỈ một từ: "YES" nếu liên quan nha khoa, "NO" nếu không
 
 Trả lời:"""
     
-    # Chat response prompts
-    CHAT_RESPONSE_VI = """Bạn là một chuyên gia tư vấn nha khoa chuyên nghiệp với kiến thức sâu rộng. 
-Nhiệm vụ của bạn là trả lời câu hỏi của bệnh nhân dựa trên thông tin tìm kiếm và ngữ cảnh cuộc trò chuyện.
+    # Chat response prompts - Optimized for speed and context awareness
+    CHAT_RESPONSE_VI = """Bạn là chuyên gia tư vấn nha khoa. Trả lời câu hỏi dựa trên thông tin tìm kiếm VÀ ngữ cảnh cuộc trò chuyện trước đó.
 
 {conversation_summary}
 
-Câu hỏi hiện tại của bệnh nhân: {user_message}
+Câu hỏi hiện tại: {user_message}
 
 Thông tin tìm kiếm:
 {search_results}
 
-Vui lòng trả lời câu hỏi một cách:
-- Chính xác và dựa trên thông tin tìm kiếm
-- Nhất quán với ngữ cảnh cuộc trò chuyện trước đó (nếu có)
-- Dễ hiểu và thân thiện
-- Format đẹp với các đoạn văn rõ ràng, dễ đọc
-
-QUAN TRỌNG VỀ FORMAT: 
-- Mỗi đoạn văn phải được phân tách bằng HAI dấu xuống dòng (\\n\\n)
-- Mỗi đoạn văn nên là một ý tưởng hoàn chỉnh, độc lập
-- Sau mỗi câu kết thúc bằng dấu chấm (.), chấm hỏi (?), hoặc chấm than (!), nếu bắt đầu đoạn văn mới thì phải có HAI dấu xuống dòng
-- Các mục trong danh sách (1., 2., 3., hoặc -, *) phải cách nhau bằng hai dấu xuống dòng nếu là các ý tưởng riêng biệt
-- Không cần thêm dẫn chứng nguồn trong phần trả lời chính (sẽ được thêm tự động sau)
+Yêu cầu:
+- Trả lời ngắn gọn, chính xác dựa trên thông tin tìm kiếm
+- NHẤT QUÁN với ngữ cảnh cuộc trò chuyện trước đó (nếu có summary ở trên)
+- Nếu câu hỏi liên quan đến cuộc trò chuyện trước, hãy tham khảo summary để đảm bảo tính nhất quán
+- Mỗi đoạn văn cách nhau bằng \\n\\n
+- Không thêm nguồn (sẽ tự động thêm)
 
 Trả lời:"""
     
-    CHAT_RESPONSE_EN = """You are a professional dental consultant with extensive knowledge. 
-Your task is to answer the patient's question based on the search information and conversation context.
+    CHAT_RESPONSE_EN = """You are a dental consultant. Answer the question based on search information AND previous conversation context.
 
 {conversation_summary}
 
-Current patient's question: {user_message}
+Current question: {user_message}
 
 Search information:
 {search_results}
 
-Please answer the question in a way that is:
-- Accurate and based on search information
-- Consistent with previous conversation context (if any)
-- Easy to understand and friendly
-- Well-formatted with clear, readable paragraphs
-
-IMPORTANT FORMATTING:
-- Each paragraph MUST be separated by TWO newlines (\\n\\n)
-- Each paragraph should be a complete, independent idea
-- After each sentence ending with period (.), question mark (?), or exclamation (!), if starting a new paragraph, add TWO newlines
-- List items (1., 2., 3., or -, *) must be separated by two newlines if they are separate ideas
-- Do not include source citations in the main answer (they will be added automatically)
+Requirements:
+- Answer concisely and accurately based on search information
+- BE CONSISTENT with previous conversation context (if summary is provided above)
+- If the question relates to previous conversation, reference the summary to ensure consistency
+- Separate paragraphs with \\n\\n
+- Do not add sources (will be added automatically)
 
 Answer:"""
     
@@ -103,28 +89,20 @@ Vui lòng nhập lại câu hỏi liên quan đến nha khoa để tôi có th�
 
 Please re-enter a dental-related question so I can assist you best."""
 
-    # Summarization prompts - for summarizing a single response
-    SUMMARIZE_RESPONSE_VI = """Hãy tóm tắt câu trả lời sau đây về nha khoa thành một đoạn văn ngắn. Tóm tắt phải:
-    - Ngắn gọn, chỉ nêu các điểm chính
-    - Giữ lại thông tin quan trọng
-    - Không quá 2-3 câu
-    - Bằng tiếng Việt
+    # Summarization prompts - Optimized for speed (shorter, more direct)
+    SUMMARIZE_RESPONSE_VI = """Tóm tắt ngắn gọn câu trả lời về nha khoa (1-2 câu, chỉ điểm chính):
 
-    Câu hỏi: {question}
-    Câu trả lời: {response}
+Câu hỏi: {question}
+Câu trả lời: {response}
 
-    Tóm tắt:"""
+Tóm tắt:"""
 
-    SUMMARIZE_RESPONSE_EN = """Please summarize the following dental response into a short paragraph. Summary must:
-    - Be concise, only mention key points
-    - Retain important information
-    - Not exceed 2-3 sentences
-    - Be in English
+    SUMMARIZE_RESPONSE_EN = """Summarize the dental response briefly (1-2 sentences, key points only):
 
-    Question: {question}
-    Response: {response}
+Question: {question}
+Response: {response}
 
-    Summary:"""
+Summary:"""
 
 
     @staticmethod
