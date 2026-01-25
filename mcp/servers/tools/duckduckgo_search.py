@@ -1,7 +1,6 @@
-"""DuckDuckGo Search tool."""
+"""DuckDuckGo Search tool implementation for MCP Server."""
 import logging
 import warnings
-from .base import BaseSearchTool
 
 # Suppress deprecation warning
 warnings.filterwarnings("ignore", message=".*duckduckgo_search.*has been renamed.*")
@@ -9,8 +8,8 @@ warnings.filterwarnings("ignore", message=".*duckduckgo_search.*has been renamed
 logger = logging.getLogger(__name__)
 
 
-class DuckDuckGoSearchTool(BaseSearchTool):
-    """Search tool using DuckDuckGo."""
+class DuckDuckGoSearchTool:
+    """Search tool using DuckDuckGo - MCP Server implementation."""
     
     async def search(self, query: str) -> str:
         """
@@ -20,7 +19,7 @@ class DuckDuckGoSearchTool(BaseSearchTool):
             query: Search query
             
         Returns:
-            Search results as text
+            Search results as formatted text
         """
         logger.info(f"[DUCKDUCKGO] Starting search for query: {query[:100]}...")
         logger.debug(f"[DUCKDUCKGO] Full query: {query}")

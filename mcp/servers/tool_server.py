@@ -2,7 +2,7 @@
 import logging
 from typing import Dict, Any, List
 from ..base import MCPServer
-from tools.factory import SearchToolFactory
+from .tools.duckduckgo_search import DuckDuckGoSearchTool
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +13,12 @@ class ToolMCPServer(MCPServer):
     def __init__(self):
         """Initialize Tool MCP Server."""
         super().__init__("tool-server")
+        # Initialize tools (standalone, no dependency on main app)
+        self.duckduckgo_tool = DuckDuckGoSearchTool()
     
     def _register_methods(self) -> None:
         """Register tool methods."""
-        # Tool methods
+        # Tool methods only - tool selection is code-driven, not LLM-driven
         self.register_method("tools/list", self._list_tools_handler)
         self.register_method("tools/call", self._call_tool_handler)
     
@@ -25,13 +27,13 @@ class ToolMCPServer(MCPServer):
         return [
             {
                 "name": "duckduckgo_search",
-                "description": "Search using DuckDuckGo (free, unlimited)",
+                "description": "Search using DuckDuckGo (free, unlimited, privacy-focused). Returns up to 5 relevant search results with titles, content snippets, and links.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query"
+                            "description": "Search query - should be specific and descriptive for best results"
                         }
                     },
                     "required": ["query"]
@@ -44,7 +46,7 @@ class ToolMCPServer(MCPServer):
         return []
     
     def _list_prompts(self) -> list:
-        """No prompts."""
+        """No prompts - tool selection is code-driven."""
         return []
     
     async def _list_tools_handler(self) -> Dict[str, Any]:
@@ -68,9 +70,8 @@ class ToolMCPServer(MCPServer):
             raise ValueError(f"Unknown tool: {name}. Only 'duckduckgo_search' is supported.")
         
         try:
-            # Get search tool via factory
-            search_tool = SearchToolFactory.create_search_tool()
-            results = await search_tool.search(query)
+            # Use tool from MCP server (standalone, no dependency on main app)
+            results = await self.duckduckgo_tool.search(query)
             
             return {
                 "content": [
@@ -81,5 +82,5 @@ class ToolMCPServer(MCPServer):
                 ]
             }
         except Exception as e:
-            logger.error(f"Error executing tool {name}: {e}")
+            logger.error(f"Error executing tool {name}: {e}", exc_info=True)
             raise ValueError(f"Tool execution failed: {str(e)}")
