@@ -15,7 +15,7 @@ Answer:"""
     # Guardrail prompts
     GUARDRAIL_EN = """Is this question about DENTISTRY?
 
-DENTISTRY includes: teeth, gums, mouth, dental treatment, finding dental clinics/dentists, dental addresses.
+DENTISTRY includes: teeth, gums, mouth, dental treatment, orthodontic treatment, braces, aligners, Invisalign, dental implants, finding dental clinics/dentists, dental addresses, oral hygiene, dental procedures.
 
 Question: "{question}"
 
@@ -25,7 +25,7 @@ Answer:"""
     
     GUARDRAIL_VI = """Câu hỏi có liên quan đến NHA KHOA không?
 
-NHA KHOA bao gồm: răng, nướu, miệng, điều trị nha khoa, tìm địa chỉ/phòng khám nha khoa, nha sĩ.
+NHA KHOA bao gồm: răng, nướu, miệng, điều trị nha khoa, chỉnh nha, niềng răng, khay niềng, Invisalign, cấy ghép răng, tìm địa chỉ/phòng khám nha khoa, nha sĩ, vệ sinh răng miệng, thủ thuật nha khoa.
 
 Câu hỏi: "{question}"
 
