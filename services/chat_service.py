@@ -201,15 +201,8 @@ class ChatService:
             logger.warning(f"[STEP 2.2] Guardrail rejected question: {user_message}")
             
             friendly_message = PromptManager.get_rejection_message(user_lang)
-            
-            # Get conversation_id but don't save messages (not dental-related)
-            memory_result = await self.memory_client.call_method(
-                "memory/get_or_create",
-                {"conversation_id": conversation_id}
-            )
-            conv_id = memory_result["conversation_id"]
-            
-            logger.info(f"[STEP 2.3] Question rejected - NOT saved to memory. Returned friendly rejection message. Conversation ID: {conv_id}")
+            conv_id = conversation_id if conversation_id else None
+            logger.info(f"[STEP 2.3] Question rejected - NOT saved to memory. Returned friendly rejection message. Conversation ID: {conv_id or 'None'}")
             return friendly_message, conv_id
         
         # Step 3: Get or create conversation
