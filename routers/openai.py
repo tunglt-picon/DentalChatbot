@@ -84,116 +84,66 @@ async def chat_completions(request: ChatCompletionRequest):
     try:
         logger.info(f"[REQUEST] Received chat completion request - Model: {request.model}")
         
-        # Convert Pydantic models to dict for service
-        # Note: Frontend only sends the new user message, not full history
-        # Backend will retrieve full context from memory using chat_id
-        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        logger.debug(f"[REQUEST] Parsed {len(messages)} message(s) from request (should be 1 new user message)")
+        from services.phoenix_tracing import phoenix_span, is_enabled
+        import json
         
-        # Get chat_id and config from payload (if provided)
-        request_dump = request.model_dump()
-        conversation_id = request.chat_id or request_dump.get("chat_id")
-        user_config = request_dump.get("config")
-        
-        # Log conversation_id status (for debugging)
-        if conversation_id:
-            logger.info(f"[REQUEST] Received chat_id from payload: {conversation_id}")
-        else:
-            logger.warning("[REQUEST] No chat_id in payload, will create new conversation")
-        
-        # Apply user config if provided (override environment variables for this request)
-        # Only Ollama is supported, ignore any other provider settings
-        if user_config:
-            logger.info(f"[REQUEST] Applying user config: {user_config}")
-            # Create a temporary config override
-            import config as app_config
-            from services.llm_provider import OllamaProvider
-            from services.guardrail import GuardrailService
+        if is_enabled():
+            # Ghi đầy đủ input
+            messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+            messages_json = json.dumps(messages, ensure_ascii=False)
             
-            # Force Ollama provider (ignore any gemini/google config from old localStorage)
-            # Get Ollama model from user config or use default
-            ollama_model = user_config.get("ollama_model") or app_config.settings.ollama_model
-            ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
-            
-            # Create LLM provider with Ollama (only supported provider)
-            # Log config explicitly with user config values
-            logger.info(f"[REQUEST] Creating LLM provider: ollama")
-            logger.info(f"[REQUEST] Ollama config - Base URL: {app_config.settings.ollama_base_url}, Model: {ollama_model}, Guardrail Model: {ollama_guardrail_model}")
-            request_llm = OllamaProvider(
-                base_url=app_config.settings.ollama_base_url,
-                model=ollama_model
-            )
-            
-            # Create guardrail with Ollama (only supported provider)
-            # Note: For guardrail, we use the guardrail_model as the main model
-            # since guardrail always uses use_guardrail_model=True
-            guardrail_llm = OllamaProvider(
-                base_url=app_config.settings.ollama_base_url,
-                model=ollama_guardrail_model,
-                guardrail_model=ollama_guardrail_model  # Explicitly set guardrail_model
-            )
-            
-            # Create temporary guardrail service with custom LLM (skip default initialization)
-            from services.guardrail import GuardrailService
-            request_guardrail = GuardrailService.__new__(GuardrailService)  # Create without __init__
-            request_guardrail.llm = guardrail_llm
-            logger.info(f"[REQUEST] Using guardrail model: {ollama_guardrail_model} (from user config)")
-            
-            # Create temporary chat service with custom LLM and guardrail
-            from services.chat_service import ChatService
-            # Create ChatService without calling __init__ to avoid creating default LLM/guardrail
-            request_chat_service = ChatService.__new__(ChatService)
-            # Setup MCP host
-            request_chat_service.mcp_host = mcp_host
-            request_chat_service.memory_client = mcp_host.memory_client
-            request_chat_service.tool_client = mcp_host.tool_client
-            # Set custom LLM and guardrail
-            request_chat_service.llm = request_llm
-            request_chat_service.guardrail = request_guardrail
-            
-            # Use temporary chat service
-            chat_service_to_use = request_chat_service
-        else:
-            # Use default chat service
-            chat_service_to_use = chat_service
-        
-        # Process chat with conversation memory
-        # If conversation_id is None, service will automatically create a new one
-        response_text, conversation_id = await chat_service_to_use.process_chat(
-            messages,
-            request.model,
-            conversation_id=conversation_id
-        )
-        
-        logger.debug(f"Processed chat with conversation_id: {conversation_id}")
-        
-        # Format response in OpenAI format
-        response_data = {
-            "id": f"chatcmpl-{int(time.time())}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": request.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_text
-                    },
-                    "finish_reason": "stop"
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 0,  # Could implement token counting if needed
-                "completion_tokens": 0,
-                "total_tokens": 0
+            attributes = {
+                "request.model": request.model,
+                "request.input.messages": messages_json,
+                "request.input.messages.count": len(messages),
+                "request.input.temperature": str(request.temperature) if request.temperature else "None",
+                "request.input.max_tokens": str(request.max_tokens) if request.max_tokens else "None",
+                "request.input.stream": str(request.stream) if request.stream else "False"
             }
-        }
+            
+            # Ghi user message riêng để dễ đọc
+            user_message = ""
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    user_message = msg.get("content", "")
+                    break
+            if user_message:
+                attributes["request.input.user_message"] = user_message
+                attributes["request.input.user_message.length"] = len(user_message)
+            
+            if request.chat_id:
+                attributes["request.input.chat_id"] = request.chat_id
+            
+            # Ghi đầy đủ request payload
+            request_dump = request.model_dump()
+            request_json = json.dumps(request_dump, ensure_ascii=False)
+            attributes["request.input.full"] = request_json
+            
+            with phoenix_span("chat.completion.request", attributes) as parent_span:
+                response_data = await _process_chat_request_internal(request)
+                
+                # Ghi đầy đủ output
+                if response_data.get("choices") and len(response_data["choices"]) > 0:
+                    response_text = response_data["choices"][0]["message"]["content"]
+                    parent_span.set_attribute("response.output.text", response_text)
+                    parent_span.set_attribute("response.output.text.length", len(response_text))
+                
+                if "system_fingerprint" in response_data:
+                    parent_span.set_attribute("response.output.conversation_id", response_data["system_fingerprint"])
+                
+                # Ghi đầy đủ response payload
+                response_json = json.dumps(response_data, ensure_ascii=False)
+                parent_span.set_attribute("response.output.full", response_json)
+                
+                # Ghi các thông tin khác
+                parent_span.set_attribute("response.output.model", response_data.get("model", "unknown"))
+                parent_span.set_attribute("response.output.id", response_data.get("id", "unknown"))
+                if response_data.get("usage"):
+                    parent_span.set_attribute("response.output.usage", json.dumps(response_data["usage"], ensure_ascii=False))
+                
+                return response_data
         
-        # Add conversation_id to response for conversation continuity
-        response_data["system_fingerprint"] = conversation_id
-        
-        return response_data
+        return await _process_chat_request_internal(request)
         
     except ValueError as e:
         logger.warning(f"Validation error: {str(e)}")
@@ -219,47 +169,128 @@ async def chat_completions(request: ChatCompletionRequest):
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
                 "total_tokens": 0
-            },
-            "error": {
-                "message": error_message,
-                "type": "invalid_request_error",
-                "code": "guardrail_rejection"
             }
         }
-        
-        # Return error response with 200 status (OpenAI-compatible)
         return error_response
-        
     except Exception as e:
         logger.error(f"Error processing chat completion: {e}", exc_info=True)
-        # Return error in OpenAI format
-        error_response = {
-            "id": f"chatcmpl-error-{int(time.time())}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": request.model if hasattr(request, 'model') else "unknown",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": f"Internal server error: {str(e)}"
-                    },
-                    "finish_reason": "stop"
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0
-            },
-            "error": {
-                "message": str(e),
-                "type": "server_error",
-                "code": "internal_error"
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+async def _process_chat_request_internal(request: ChatCompletionRequest):
+    """Internal function to process chat request - extracted for parent span grouping."""
+    import time
+    
+    # Convert Pydantic models to dict for service
+    # Note: Frontend only sends the new user message, not full history
+    # Backend will retrieve full context from memory using chat_id
+    messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+    logger.debug(f"[REQUEST] Parsed {len(messages)} message(s) from request (should be 1 new user message)")
+    
+    # Get chat_id and config from payload (if provided)
+    request_dump = request.model_dump()
+    conversation_id = request.chat_id or request_dump.get("chat_id")
+    user_config = request_dump.get("config")
+    
+    # Log conversation_id status (for debugging)
+    if conversation_id:
+        logger.info(f"[REQUEST] Received chat_id from payload: {conversation_id}")
+    else:
+        logger.warning("[REQUEST] No chat_id in payload, will create new conversation")
+    
+    # Apply user config if provided (override environment variables for this request)
+    # Only Ollama is supported, ignore any other provider settings
+    if user_config:
+        logger.info(f"[REQUEST] Applying user config: {user_config}")
+        # Create a temporary config override
+        import config as app_config
+        from services.llm_provider import OllamaProvider
+        from services.guardrail import GuardrailService
+        
+        # Force Ollama provider (ignore any gemini/google config from old localStorage)
+        # Get Ollama model from user config or use default
+        ollama_model = user_config.get("ollama_model") or app_config.settings.ollama_model
+        ollama_guardrail_model = user_config.get("ollama_guardrail_model") or app_config.settings.ollama_guardrail_model
+        
+        # Create LLM provider with Ollama (only supported provider)
+        # Log config explicitly with user config values
+        logger.info(f"[REQUEST] Creating LLM provider: ollama")
+        logger.info(f"[REQUEST] Ollama config - Base URL: {app_config.settings.ollama_base_url}, Model: {ollama_model}, Guardrail Model: {ollama_guardrail_model}")
+        request_llm = OllamaProvider(
+            base_url=app_config.settings.ollama_base_url,
+            model=ollama_model
+        )
+        
+        # Create guardrail with Ollama (only supported provider)
+        # Note: For guardrail, we use the guardrail_model as the main model
+        # since guardrail always uses use_guardrail_model=True
+        guardrail_llm = OllamaProvider(
+            base_url=app_config.settings.ollama_base_url,
+            model=ollama_guardrail_model,
+            guardrail_model=ollama_guardrail_model  # Explicitly set guardrail_model
+        )
+        
+        # Create temporary guardrail service with custom LLM (skip default initialization)
+        from services.guardrail import GuardrailService
+        request_guardrail = GuardrailService.__new__(GuardrailService)  # Create without __init__
+        request_guardrail.llm = guardrail_llm
+        logger.info(f"[REQUEST] Using guardrail model: {ollama_guardrail_model} (from user config)")
+        
+        # Create temporary chat service with custom LLM and guardrail
+        from services.chat_service import ChatService
+        # Create ChatService without calling __init__ to avoid creating default LLM/guardrail
+        request_chat_service = ChatService.__new__(ChatService)
+        # Setup MCP host
+        request_chat_service.mcp_host = mcp_host
+        request_chat_service.memory_client = mcp_host.memory_client
+        request_chat_service.tool_client = mcp_host.tool_client
+        # Set custom LLM and guardrail
+        request_chat_service.llm = request_llm
+        request_chat_service.guardrail = request_guardrail
+        
+        # Use temporary chat service
+        chat_service_to_use = request_chat_service
+    else:
+        # Use default chat service
+        chat_service_to_use = chat_service
+    
+    # Process chat with conversation memory
+    # If conversation_id is None, service will automatically create a new one
+    response_text, conversation_id = await chat_service_to_use.process_chat(
+        messages,
+        request.model,
+        conversation_id=conversation_id
+    )
+    
+    logger.debug(f"Processed chat with conversation_id: {conversation_id}")
+    
+    # Format response in OpenAI format
+    response_data = {
+        "id": f"chatcmpl-{int(time.time())}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": request.model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response_text
+                },
+                "finish_reason": "stop"
             }
+        ],
+        "usage": {
+            "prompt_tokens": 0,  # Could implement token counting if needed
+            "completion_tokens": 0,
+            "total_tokens": 0
         }
-        return error_response
+    }
+    
+    # Add conversation_id to response for conversation continuity
+    response_data["system_fingerprint"] = conversation_id
+    
+    return response_data
 
 
 @router.get("/v1/conversations/{conversation_id}")

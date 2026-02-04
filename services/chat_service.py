@@ -2,6 +2,7 @@
 import logging
 import re
 import asyncio
+import json
 from typing import Optional, Tuple
 from clients.mcp_client import MCPHost
 from services.guardrail import GuardrailService
@@ -188,14 +189,17 @@ class ChatService:
             logger.error("[STEP 1.3] No user message found in messages")
             raise ValueError("User message not found")
         
-        # Step 1.5: Detect language
         from services.guardrail import detect_language_llm
+        from services.phoenix_tracing import phoenix_span
+        
         user_lang = await detect_language_llm(user_message, self.guardrail.llm)
+        
         logger.info(f"[STEP 1.5] Detected user language: {user_lang}")
         
-        # Step 2: Guardrail check
-        logger.info(f"[STEP 2] Checking guardrail for question: {user_message[:50]}...")
-        is_dental, user_lang = await self.guardrail.is_dental_related(user_message, user_lang=user_lang)
+        from services.phoenix_tracing import phoenix_span
+        
+        is_dental, user_lang, llm_response = await self.guardrail.is_dental_related(user_message, user_lang=user_lang)
+        
         logger.info(f"[STEP 2.1] Guardrail result: {'PASSED' if is_dental else 'REJECTED'}")
         if not is_dental:
             logger.warning(f"[STEP 2.2] Guardrail rejected question: {user_message}")
@@ -203,24 +207,53 @@ class ChatService:
             friendly_message = PromptManager.get_rejection_message(user_lang)
             conv_id = conversation_id if conversation_id else None
             logger.info(f"[STEP 2.3] Question rejected - NOT saved to memory. Returned friendly rejection message. Conversation ID: {conv_id or 'None'}")
+            
+            with phoenix_span("guardrail.reject") as span:
+                span.set_attribute("guardrail.input.user_message", user_message)
+                span.set_attribute("guardrail.input.user_lang", user_lang)
+                span.set_attribute("guardrail.output.action", "reject")
+                span.set_attribute("guardrail.output.rejection_message", friendly_message)
+                if conv_id:
+                    span.set_attribute("custom.conversation_id", conv_id)
+            
             return friendly_message, conv_id
         
-        # Step 3: Get or create conversation
-        logger.info(f"[STEP 3] Getting or creating conversation: {conversation_id}")
-        memory_result = await self.memory_client.call_method(
-            "memory/get_or_create",
-            {"conversation_id": conversation_id}
-        )
-        conv_id = memory_result["conversation_id"]
+        with phoenix_span("memory.get_or_create_conversation") as span:
+            request_payload = {"conversation_id": conversation_id}
+            span.set_attribute("memory.input.conversation_id", conversation_id or "new")
+            span.set_attribute("memory.input.request", json.dumps(request_payload, ensure_ascii=False))
+            span.set_attribute("memory.input.method", "memory/get_or_create")
+            
+            memory_result = await self.memory_client.call_method(
+                "memory/get_or_create",
+                {"conversation_id": conversation_id}
+            )
+            conv_id = memory_result["conversation_id"]
+            
+            span.set_attribute("memory.output.conversation_id", conv_id)
+            span.set_attribute("memory.output.is_new", str(conversation_id is None or conversation_id != conv_id))
+            span.set_attribute("memory.output.full", json.dumps(memory_result, ensure_ascii=False))
+        
         logger.info(f"[STEP 3.1] Conversation ID: {conv_id}")
         
-        # Step 4: Get existing summary
-        logger.info(f"[STEP 4] Getting existing conversation summary for: {conv_id}")
-        summary_result = await self.memory_client.call_method(
-            "memory/get_summary",
-            {"conversation_id": conv_id}
-        )
-        existing_summary = summary_result.get("summary", "")
+        with phoenix_span("memory.get_conversation_summary") as span:
+            request_payload = {"conversation_id": conv_id}
+            span.set_attribute("memory.input.conversation_id", conv_id)
+            span.set_attribute("memory.input.request", json.dumps(request_payload, ensure_ascii=False))
+            span.set_attribute("memory.input.method", "memory/get_summary")
+            
+            summary_result = await self.memory_client.call_method(
+                "memory/get_summary",
+                {"conversation_id": conv_id}
+            )
+            existing_summary = summary_result.get("summary", "")
+            
+            span.set_attribute("memory.output.summary.exists", str(bool(existing_summary)))
+            if existing_summary:
+                span.set_attribute("memory.output.summary", existing_summary)
+                span.set_attribute("memory.output.summary.length", len(existing_summary))
+            span.set_attribute("memory.output.full", json.dumps(summary_result, ensure_ascii=False))
+        
         if existing_summary:
             logger.info(f"[STEP 4.1] Found existing summary: {existing_summary[:100]}...")
         else:
@@ -231,14 +264,29 @@ class ChatService:
         logger.info(f"[STEP 6] Calling search tool: {tool_name} for query: {user_message[:50]}...")
         
         try:
-            tool_result = await self.tool_client.call_method(
-                "tools/call",
-                {
-                    "name": tool_name,
-                    "arguments": {"query": user_message}
-                }
-            )
-            search_results = tool_result["content"][0]["text"]
+            from services.phoenix_tracing import phoenix_span
+            from openinference.semconv.trace import SpanAttributes
+            
+            tool_input = {"query": user_message}
+            
+            with phoenix_span("tool.duckduckgo_search") as span:
+                span.set_attribute(SpanAttributes.TOOL_NAME, tool_name)
+                span.set_attribute("tool.input.query", user_message)
+                span.set_attribute("tool.input.method", "tools/call")
+                span.set_attribute("tool.input.arguments", json.dumps(tool_input, ensure_ascii=False))
+                span.set_attribute("custom.conversation_id", conv_id)
+                
+                tool_result = await self.tool_client.call_method(
+                    "tools/call",
+                    {"name": tool_name, "arguments": tool_input}
+                )
+                
+                search_results = tool_result["content"][0]["text"]
+                span.set_attribute("tool.input.full", json.dumps(tool_input, ensure_ascii=False))
+                span.set_attribute("tool.output", search_results)
+                span.set_attribute("tool.output.length", len(search_results))
+                span.set_attribute("tool.output.full", json.dumps(tool_result, ensure_ascii=False))
+            
             logger.info(f"[STEP 6.1] Search completed. Results length: {len(search_results)} characters")
             logger.info(f"[STEP 6.2] Search results (full):\n{search_results}")
         except Exception as e:
@@ -258,10 +306,6 @@ class ChatService:
         else:
             logger.info(f"[STEP 7.2] No summary (first question in conversation)")
         
-        # Extract sources from search results
-        sources = _extract_sources(search_results)
-        logger.debug(f"[STEP 7.3] Extracted {len(sources)} sources from search results")
-        
         # Build prompt using PromptManager
         prompt = PromptManager.get_chat_response_prompt(
             user_message=user_message,
@@ -273,10 +317,23 @@ class ChatService:
         logger.info(f"[STEP 7.4] Prompt built. Length: {len(prompt)} characters")
         logger.info(f"[STEP 7.4.1] Conversation summary in prompt: {conversation_summary[:200] if conversation_summary else 'EMPTY'}...")
         
+        with phoenix_span("tool.extract_sources") as span:
+            span.set_attribute("sources.input.search_results", search_results)
+            span.set_attribute("sources.input.search_results_length", len(search_results))
+            
+            sources = _extract_sources(search_results)
+            
+            sources_json = json.dumps(sources, ensure_ascii=False)
+            span.set_attribute("sources.output.sources", sources_json)
+            span.set_attribute("sources.output.count", len(sources))
+        
+        logger.debug(f"[STEP 7.3] Extracted {len(sources)} sources from search results")
+        
         # Step 8: Generate response with LLM
         logger.info(f"[STEP 8] Generating response with LLM provider: {config.settings.llm_provider}")
         try:
             response_text = await self.llm.generate(prompt)
+            
             logger.info(f"[STEP 8.1] LLM response generated. Length: {len(response_text)} characters")
             
             # Format response
@@ -289,16 +346,30 @@ class ChatService:
         
         # Step 9: Save messages to memory
         logger.info(f"[STEP 9] Saving messages to memory for conversation: {conv_id}")
-        await self.memory_client.call_method(
-            "memory/add_message",
-            {"conversation_id": conv_id, "role": "user", "content": user_message}
-        )
-        logger.debug(f"[STEP 9.1] Saved user message")
-        await self.memory_client.call_method(
-            "memory/add_message",
-            {"conversation_id": conv_id, "role": "assistant", "content": response_text}
-        )
-        logger.debug(f"[STEP 9.2] Saved assistant message")
+        
+        with phoenix_span("memory.save_messages") as span:
+            span.set_attribute("memory.input.conversation_id", conv_id)
+            
+            user_message_payload = {"conversation_id": conv_id, "role": "user", "content": user_message}
+            span.set_attribute("memory.input.user_message", user_message)
+            span.set_attribute("memory.input.user_message.request", json.dumps(user_message_payload, ensure_ascii=False))
+            
+            await self.memory_client.call_method(
+                "memory/add_message",
+                user_message_payload
+            )
+            
+            assistant_message_payload = {"conversation_id": conv_id, "role": "assistant", "content": response_text}
+            span.set_attribute("memory.input.assistant_message", response_text)
+            span.set_attribute("memory.input.assistant_message.request", json.dumps(assistant_message_payload, ensure_ascii=False))
+            
+            await self.memory_client.call_method(
+                "memory/add_message",
+                assistant_message_payload
+            )
+            
+            span.set_attribute("memory.output.messages_saved", "2")
+            span.set_attribute("memory.output.method", "memory/add_message")
         
         # Step 9.3: Start summarization as background task
         logger.info(f"[STEP 9.3] Starting summarization as background task (non-blocking)")
@@ -313,6 +384,7 @@ class ChatService:
         )
         
         logger.info(f"[STEP 9.4] Chat processing completed successfully. Response returned immediately, summarization running in background.")
+        
         return response_text, conv_id
     
     async def _summarize_and_update_summary(
@@ -336,25 +408,64 @@ class ChatService:
         try:
             logger.info(f"[BACKGROUND] Starting summarization for conversation: {conv_id}")
             
+            from services.phoenix_tracing import phoenix_span
+            from openinference.semconv.trace import SpanAttributes
+            
             summarize_prompt = PromptManager.get_summarize_response_prompt(
                 question=user_message,
                 response=response_text,
                 language=user_lang
             )
-            new_response_summary = await self.guardrail.llm.generate(summarize_prompt, use_guardrail_model=True, max_tokens=100)
-            new_response_summary = new_response_summary.strip()
+            
+            with phoenix_span("llm.generate.summary") as span:
+                span.set_attribute(SpanAttributes.LLM_MODEL_NAME, config.settings.ollama_guardrail_model)
+                span.set_attribute("custom.conversation_id", conv_id)
+                span.set_attribute("custom.user_lang", user_lang)
+                span.set_attribute("summary.input.user_message", user_message)
+                span.set_attribute("summary.input.user_message.length", len(user_message))
+                span.set_attribute("summary.input.response_text", response_text)
+                span.set_attribute("summary.input.response_text.length", len(response_text))
+                span.set_attribute("summary.input.existing_summary", existing_summary)
+                span.set_attribute("summary.input.existing_summary.length", len(existing_summary))
+                
+                input_messages = [{"role": "user", "content": summarize_prompt}]
+                span.set_attribute(SpanAttributes.LLM_INPUT_MESSAGES, json.dumps(input_messages, ensure_ascii=False))
+                span.set_attribute("summary.input.prompt", summarize_prompt)
+                span.set_attribute("summary.input.prompt.length", len(summarize_prompt))
+                span.set_attribute("summary.input.max_tokens", "100")
+                
+                new_response_summary = await self.guardrail.llm.generate(summarize_prompt, use_guardrail_model=True, max_tokens=100)
+                new_response_summary = new_response_summary.strip()
+                
+                output_messages = [{"role": "assistant", "content": new_response_summary}]
+                span.set_attribute(SpanAttributes.LLM_OUTPUT_MESSAGES, json.dumps(output_messages, ensure_ascii=False))
+                span.set_attribute("summary.output.summary", new_response_summary)
+                span.set_attribute("summary.output.summary.length", len(new_response_summary))
+            
             logger.info(f"[BACKGROUND] Summary generated: {new_response_summary[:100]}...")
             
-            if existing_summary:
-                updated_summary = f"{existing_summary}\n\n{new_response_summary}"
-            else:
-                updated_summary = new_response_summary
-            
-            # Save updated summary
-            await self.memory_client.call_method(
-                "memory/set_summary",
-                {"conversation_id": conv_id, "summary": updated_summary, "compress": False}
-            )
-            logger.info(f"[BACKGROUND] Summary updated successfully. New summary length: {len(updated_summary)} characters")
+            with phoenix_span("memory.update_summary") as span:
+                span.set_attribute("memory.input.conversation_id", conv_id)
+                span.set_attribute("memory.input.new_summary", new_response_summary)
+                span.set_attribute("memory.input.existing_summary", existing_summary)
+                span.set_attribute("memory.input.existed", str(bool(existing_summary)))
+                
+                if existing_summary:
+                    updated_summary = f"{existing_summary}\n\n{new_response_summary}"
+                else:
+                    updated_summary = new_response_summary
+                
+                request_payload = {"conversation_id": conv_id, "summary": updated_summary, "compress": False}
+                span.set_attribute("memory.input.request", json.dumps(request_payload, ensure_ascii=False))
+                span.set_attribute("memory.input.method", "memory/set_summary")
+                
+                await self.memory_client.call_method(
+                    "memory/set_summary",
+                    request_payload
+                )
+                
+                span.set_attribute("memory.output.updated_summary", updated_summary)
+                span.set_attribute("memory.output.updated_summary.length", len(updated_summary))
+                span.set_attribute("memory.output.summary_increased", str(len(updated_summary) > len(existing_summary) if existing_summary else True))
         except Exception as e:
             logger.error(f"[BACKGROUND] Error updating summary: {e}", exc_info=True)

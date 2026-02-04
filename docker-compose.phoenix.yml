@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database cho Phoenix
+  phoenix-postgres:
+    image: postgres:15-alpine
+    container_name: phoenix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: phoenix
+      POSTGRES_PASSWORD: ${PHOENIX_DB_PASSWORD:-phoenix_password}
+      POSTGRES_DB: phoenix_db
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - phoenix-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${PHOENIX_DB_PORT:-5433}:5432"  # Port 5433
+    networks:
+      - phoenix-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phoenix -d phoenix_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Phoenix Observability Server
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: phoenix-server
+    restart: unless-stopped
+    ports:
+      - "${PHOENIX_PORT:-6006}:6006"  # Phoenix UI port
+      - "4317:4317"  # OTLP gRPC receiver port (exposed but not mapped to host by default)
+    environment:
+      # Kết nối đến PostgreSQL
+      - PHOENIX_DATABASE_URL=postgresql://phoenix:${PHOENIX_DB_PASSWORD:-phoenix_password}@phoenix-postgres:5432/phoenix_db
+      # Cấu hình Phoenix
+      - PHOENIX_HOST=0.0.0.0
+      - PHOENIX_PORT=6006
+    depends_on:
+      phoenix-postgres:
+        condition: service_healthy
+    networks:
+      - phoenix-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  phoenix-postgres-data:
+    driver: local
+
+networks:
+  phoenix-network:
+    driver: bridge
+    name: phoenix-network

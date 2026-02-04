@@ -16,6 +16,13 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Initialize Phoenix tracing if enabled
+try:
+    from services.phoenix_tracing import initialize_phoenix
+    initialize_phoenix()
+except Exception as e:
+    logger.warning(f"Failed to initialize Phoenix tracing: {e}")
+
 # Create FastAPI app
 app = FastAPI(
     title="Dental Chatbot API",

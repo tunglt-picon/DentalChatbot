@@ -7,3 +7,9 @@ pydantic
 pydantic-settings
 aiofiles
 httpx
+# Phoenix Observability
+arize-phoenix
+openinference-semantic-conventions
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc

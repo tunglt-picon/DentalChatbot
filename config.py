@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     # ============================================
     # MCP HTTP Server URL (default: localhost:8001)
     mcp_server_url: str = "http://localhost:8001"
+    
+    # ============================================
+    # Phoenix Observability Configuration
+    # ============================================
+    phoenix_enabled: bool = True
+    
+    # Phoenix server endpoint (default: localhost:4317 for gRPC OTLP)
+    # Phoenix OTLP receiver uses gRPC on port 4317, not HTTP on port 6006
+    # Port 6006 is for UI only
+    # Khi chạy trong Docker, sử dụng: http://phoenix:4317
+    # Khi chạy local, sử dụng: http://localhost:4317
+    phoenix_endpoint: str = "http://localhost:4317"
+    
+    # Phoenix project name (default: dental-chatbot)
+    phoenix_project_name: str = "dental-chatbot"
 
 
 settings = Settings()
